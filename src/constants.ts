@@ -13,15 +13,16 @@ import { StandardType } from './types';
 
 /**
  * OAuth-based API endpoints (recommended)
+ * Note: Trailing slash is required for proper URL construction with new URL()
  */
-export const BASE_PATH_OAUTH_TEST = 'https://api.anaf.ro/test/FCTEL/rest';
-export const BASE_PATH_OAUTH_PROD = 'https://api.anaf.ro/prod/FCTEL/rest';
+export const BASE_PATH_OAUTH_TEST = 'https://api.anaf.ro/test/FCTEL/rest/';
+export const BASE_PATH_OAUTH_PROD = 'https://api.anaf.ro/prod/FCTEL/rest/';
 
 /**
  * Certificate-based API endpoints
  */
-export const BASE_PATH_CERT_TEST = 'https://webserviceapl.anaf.ro/test/FCTEL/rest';
-export const BASE_PATH_CERT_PROD = 'https://webserviceapl.anaf.ro/prod/FCTEL/rest';
+export const BASE_PATH_CERT_TEST = 'https://webserviceapl.anaf.ro/test/FCTEL/rest/';
+export const BASE_PATH_CERT_PROD = 'https://webserviceapl.anaf.ro/prod/FCTEL/rest/';
 
 // =============================================================================
 // OAuth 2.0 Authentication Endpoints
@@ -47,43 +48,49 @@ export const OAUTH_TOKEN_URL = 'https://logincert.anaf.ro/anaf-oauth2/v1/token';
  * Upload invoice document
  * POST {basePath}/upload?standard={UBL|CN|CII|RASP}&cif={vatNumber}
  * Optional params: extern, autofactura, executare
+ * Note: No leading slash - relative to base path for proper URL construction
  */
-export const UPLOAD_PATH = '/upload';
+export const UPLOAD_PATH = 'upload';
 
 /**
  * Upload B2C (Business to Consumer) invoice
  * POST {basePath}/uploadb2c?cif={vatNumber}
  * Used for simplified B2C invoices
+ * Note: No leading slash - relative to base path for proper URL construction
  */
-export const UPLOAD_B2C_PATH = '/uploadb2c';
+export const UPLOAD_B2C_PATH = 'uploadb2c';
 
 /**
  * Check upload status
  * GET {basePath}/stareMesaj?id_incarcare={uploadId}
  * Returns current processing status of uploaded document
+ * Note: No leading slash - relative to base path for proper URL construction
  */
-export const STATUS_MESSAGE_PATH = '/stareMesaj';
+export const STATUS_MESSAGE_PATH = 'stareMesaj';
 
 /**
  * Download processed document
  * GET {basePath}/descarcare?id={downloadId}
  * Downloads the processed invoice or error details
+ * Note: No leading slash - relative to base path for proper URL construction
  */
-export const DOWNLOAD_PATH = '/descarcare';
+export const DOWNLOAD_PATH = 'descarcare';
 
 /**
  * List messages (simple)
  * GET {basePath}/listaMesajeFactura?zile={days}&cif={vatNumber}
  * Optional param: filtru={E|T|P|R}
+ * Note: No leading slash - relative to base path for proper URL construction
  */
-export const LIST_MESSAGES_PATH = '/listaMesajeFactura';
+export const LIST_MESSAGES_PATH = 'listaMesajeFactura';
 
 /**
  * List messages with pagination
  * GET {basePath}/listaMesajePaginatieFactura?startTime={timestamp}&endTime={timestamp}&pagina={page}&cif={vatNumber}
  * Optional param: filtru={E|T|P|R}
+ * Note: No leading slash - relative to base path for proper URL construction
  */
-export const LIST_MESSAGES_PAGINATED_PATH = '/listaMesajePaginatieFactura';
+export const LIST_MESSAGES_PAGINATED_PATH = 'listaMesajePaginatieFactura';
 
 // =============================================================================
 // Validation and Conversion Endpoints

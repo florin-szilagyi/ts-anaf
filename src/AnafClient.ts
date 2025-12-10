@@ -389,7 +389,7 @@ export class AnafEfacturaClient {
     this.validateXmlContent(xmlContent);
     this.validateDocumentStandard(standard);
 
-    const url = `/validare/${standard}`;
+    const url = `validare/${standard}`;
 
     const { data, error } = tryCatch(async () => {
       const accessToken = await this.getValidAccessToken();
@@ -438,7 +438,7 @@ export class AnafEfacturaClient {
     xmlFileName?: string,
     signatureFileName?: string
   ): Promise<ValidationResult> {
-    const url = `/api/validate/signature`;
+    const url = `api/validate/signature`;
 
     const formData = new FormData();
 
@@ -511,7 +511,7 @@ export class AnafEfacturaClient {
     this.validateXmlContent(xmlContent);
     this.validateDocumentStandard(standard);
 
-    const url = `/transformare/${standard}`;
+    const url = `transformare/${standard}`;
 
     const { data, error } = tryCatch(async () => {
       const accessToken = await this.getValidAccessToken();
@@ -565,7 +565,7 @@ export class AnafEfacturaClient {
     this.validateXmlContent(xmlContent);
     this.validateDocumentStandard(standard);
 
-    const url = `/transformare/${standard}/DA`;
+    const url = `transformare/${standard}/DA`;
 
     const { data, error } = tryCatch(async () => {
       const accessToken = await this.getValidAccessToken();
