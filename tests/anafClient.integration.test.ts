@@ -245,7 +245,7 @@ describe('AnafEfacturaClient Integration Tests', () => {
         console.log('ℹ️ No paginated messages found');
       }
     }, 30000);
-
+  });
 
   describe('Document Download Operations', () => {
     test('should handle download request (may not have content)', async () => {

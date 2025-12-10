@@ -1,6 +1,6 @@
 import { AnafEfacturaClient } from '../src';
 import { AnafValidationError, AnafApiError, AnafAuthenticationError } from '../src/errors';
-import { UploadOptions, PaginatedMessagesParams, ListMessagesParams, MessageFilter } from '../src/types';
+import { UploadOptions, PaginatedMessagesParams, MessageFilter } from '../src/types';
 import { AnafAuthenticator } from '../src/AnafAuthenticator';
 import { mockTestData } from './testUtils';
 

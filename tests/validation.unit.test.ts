@@ -1,6 +1,5 @@
 import { AnafEfacturaClient } from '../src/AnafClient';
 import { AnafAuthenticator } from '../src/AnafAuthenticator';
-import { ValidationResult } from '../src/types';
 import { AnafApiError, AnafValidationError } from '../src/errors';
 
 // Mock fetch globally

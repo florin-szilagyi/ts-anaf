@@ -1,5 +1,5 @@
 import { AnafDetailsClient } from '../src/AnafDetailsClient';
-import { AnafCompanyResult, AnafApiResponse } from '../src/types';
+import { AnafApiResponse } from '../src/types';
 
 // Mock fetch globally
 global.fetch = jest.fn();

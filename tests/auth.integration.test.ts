@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
-import path, { resolve } from 'path';
+import path from 'path';
 import { spawn } from 'child_process';
 import { AnafEfacturaClient } from '../src';
 import { AnafAuthenticator } from '../src/AnafAuthenticator';
