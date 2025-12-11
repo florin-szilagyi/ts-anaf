@@ -219,16 +219,13 @@ export class TestTokenManager {
     return Date.now() >= tokens.expires_at - expirationBuffer;
   }
 
-  static hasValidTokens(): boolean {
-    const { data, error } = tryCatch(() => {
-      const tokens = this.loadTokens();
-      return tokens !== null && !this.isTokenExpired(tokens as any);
-    });
-    if (error) {
+  static async hasValidTokens(): Promise<boolean> {
+    try {
+      const tokens = await this.loadTokens();
+      return tokens !== null && !this.isTokenExpired(tokens);
+    } catch {
       return false;
     }
-
-    return data;
   }
 }
 

@@ -646,7 +646,7 @@ try {
 The SDK is written in TypeScript and provides comprehensive type definitions:
 
 ```typescript
-import type { InvoiceInput, UploadStatus, ListMessagesResponse, ValidationResult, OAuthTokens } from 'anaf-ts-sdk';
+import type { InvoiceInput, UploadResponse, ListMessagesResponse, ValidationResult, OAuthTokens } from 'anaf-ts-sdk';
 ```
 
 ## Security Best Practices

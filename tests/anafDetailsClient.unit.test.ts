@@ -149,7 +149,7 @@ describe('AnafDetailsClient Unit Tests', () => {
       const result = await client.getCompanyData('RO12345678');
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('An unexpected error occurred while contacting the ANAF service.');
+      expect(result.error).toBe('Network error: Could not connect to ANAF service.');
     });
 
     test('should handle unexpected response structure', async () => {

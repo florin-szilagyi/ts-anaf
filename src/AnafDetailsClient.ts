@@ -227,7 +227,7 @@ export class AnafDetailsClient {
       }
 
       // Distinguish network errors from other errors
-      if (error.message?.includes('fetch failed') || error.message?.includes('Network error: fetch')) {
+      if (error.message?.includes('fetch') || error.message?.toLowerCase().includes('network')) {
         return {
           success: false,
           error: 'Network error: Could not connect to ANAF service.',
