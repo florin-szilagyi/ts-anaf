@@ -94,6 +94,80 @@ describe('AnafEfacturaClient Unit Tests', () => {
       );
       expect(prodClient).toBeDefined();
     });
+
+    test('should normalize VAT number by removing RO prefix', () => {
+      // Test with RO prefix (uppercase)
+      const clientWithRO = new AnafEfacturaClient(
+        {
+          vatNumber: 'RO46509364',
+          testMode: true,
+          refreshToken: 'mock_refresh_token',
+        },
+        mockAuthenticator
+      );
+      expect(clientWithRO).toBeDefined();
+
+      // Test with ro prefix (lowercase)
+      const clientWithRoLowercase = new AnafEfacturaClient(
+        {
+          vatNumber: 'ro46509364',
+          testMode: true,
+          refreshToken: 'mock_refresh_token',
+        },
+        mockAuthenticator
+      );
+      expect(clientWithRoLowercase).toBeDefined();
+
+      // Test with RO prefix and extra spaces
+      const clientWithROAndSpaces = new AnafEfacturaClient(
+        {
+          vatNumber: '  RO46509364  ',
+          testMode: true,
+          refreshToken: 'mock_refresh_token',
+        },
+        mockAuthenticator
+      );
+      expect(clientWithROAndSpaces).toBeDefined();
+
+      // Test without RO prefix (should work as before)
+      const clientWithoutRO = new AnafEfacturaClient(
+        {
+          vatNumber: '46509364',
+          testMode: true,
+          refreshToken: 'mock_refresh_token',
+        },
+        mockAuthenticator
+      );
+      expect(clientWithoutRO).toBeDefined();
+    });
+
+    test('should send normalized VAT number in API requests', async () => {
+      const xmlContent = '<?xml version="1.0"?><Invoice>test</Invoice>';
+
+      const clientWithRO = new AnafEfacturaClient(
+        {
+          vatNumber: 'RO46509364',
+          testMode: true,
+          refreshToken: 'mock_refresh_token',
+        },
+        mockAuthenticator
+      );
+
+      (fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => (name === 'content-type' ? 'text/xml' : null),
+        },
+        text: () => Promise.resolve(mockTestData.mockXmlResponses.uploadSuccess),
+      });
+
+      await clientWithRO.uploadDocument(xmlContent);
+
+      // Verify the URL contains the normalized CIF without RO prefix
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('cif=46509364'), expect.any(Object));
+      expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('cif=RO46509364'), expect.any(Object));
+    });
   });
 
   describe('Document Upload', () => {

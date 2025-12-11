@@ -98,6 +98,8 @@ const validation = await client.validateXml(xmlContent, 'FACT1');
 const pdfBuffer = await client.convertXmlToPdf(xmlContent, 'FACT1');
 ```
 
+**Note:** The client automatically normalizes VAT numbers by removing the "RO" prefix if present. ANAF API expects numeric CIF values only, so you can provide either `'RO12345678'` or `'12345678'` - both formats work correctly.
+
 ### 3. UblBuilder - UBL XML Generation
 
 ```typescript
@@ -637,6 +639,18 @@ try {
     console.log('API error:', error.message);
   }
 }
+```
+
+### Common Errors and Solutions
+
+**CIF Error: "CIF introdus= RO46509364 nu este un numar"**
+
+This error occurs when the VAT number includes the "RO" prefix, which ANAF API doesn't accept. The SDK automatically handles this by removing the "RO" prefix, so you can provide either format:
+
+```typescript
+// Both of these work identically:
+const client1 = new AnafEfacturaClient({ vatNumber: 'RO12345678', ... }, authenticator);
+const client2 = new AnafEfacturaClient({ vatNumber: '12345678', ... }, authenticator);
 ```
 
 ## TypeScript Support

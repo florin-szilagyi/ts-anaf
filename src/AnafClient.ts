@@ -99,6 +99,7 @@ export class AnafEfacturaClient {
 
     this.config = {
       ...config,
+      vatNumber: this.normalizeVatNumber(config.vatNumber),
       testMode: config.testMode ?? false,
       timeout: config.timeout ?? DEFAULT_TIMEOUT,
       axiosOptions: config.axiosOptions ?? {},
@@ -603,6 +604,25 @@ export class AnafEfacturaClient {
   // ==========================================================================
   // PRIVATE METHODS
   // ==========================================================================
+
+  /**
+   * Normalize VAT number by removing the RO prefix if present
+   * ANAF expects only numeric CIF values without the country code
+   *
+   * @param vatNumber VAT number to normalize
+   * @returns Normalized VAT number without RO prefix
+   */
+  private normalizeVatNumber(vatNumber: string): string {
+    if (!vatNumber) return vatNumber;
+
+    const trimmed = vatNumber.trim();
+    // Remove RO prefix (case-insensitive) if present
+    if (trimmed.toUpperCase().startsWith('RO')) {
+      return trimmed.substring(2).trim();
+    }
+
+    return trimmed;
+  }
 
   /**
    * Get a valid access token, refreshing if necessary
