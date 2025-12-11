@@ -40,38 +40,40 @@ export class HttpClient {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const { data, error } = tryCatch(async () => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[HTTP] ${fetchOptions.method || 'GET'} ${fullUrl}`);
-      }
+    const { data, error } = await tryCatch(
+      (async () => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[HTTP] ${fetchOptions.method || 'GET'} ${fullUrl}`);
+        }
 
-      const response = await fetch(fullUrl, {
-        ...fetchOptions,
-        signal: controller.signal,
-      });
+        const response = await fetch(fullUrl, {
+          ...fetchOptions,
+          signal: controller.signal,
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[HTTP] Response ${response.status} for ${fullUrl}`);
-      }
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[HTTP] Response ${response.status} for ${fullUrl}`);
+        }
 
-      // Handle HTTP errors
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        this.handleHttpError(response.status, response.statusText, errorText);
-      }
+        // Handle HTTP errors
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          this.handleHttpError(response.status, response.statusText, errorText);
+        }
 
-      // Parse response based on content type
-      const data = await this.parseResponse<T>(response);
+        // Parse response based on content type
+        const data = await this.parseResponse<T>(response);
 
-      return {
-        data,
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-      };
-    });
+        return {
+          data,
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        };
+      })()
+    );
 
     if (error) {
       clearTimeout(timeoutId);
@@ -84,7 +86,8 @@ export class HttpClient {
       if (
         error instanceof AnafApiError ||
         error instanceof AnafAuthenticationError ||
-        error instanceof AnafValidationError
+        error instanceof AnafValidationError ||
+        error instanceof AnafNotFoundError
       ) {
         throw error;
       }

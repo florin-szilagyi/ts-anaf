@@ -119,26 +119,20 @@ export function createOAuthCallbackServer(): OAuthCallbackServer {
 
   return {
     app,
-    start: (port: number) => {
+    start: async (port: number) => {
       return new Promise((resolve, reject) => {
-        const { data, error } = tryCatch(async () => {
-          server = app.listen(port, () => {
-            console.log(
-              `🌐 OAuth callback server running on http://localhost:${port}\n` +
-                `🔗 Test URL: http://localhost:${port}/test\n` +
-                `📥 Callback URL: http://localhost:${port}/callback\n` +
-                `🌍 ANAF callback URL: ${process.env.ANAF_CALLBACK_URL || 'Not set'}\n` +
-                `🔗 Test ngrok: ${process.env.ANAF_CALLBACK_URL?.replace('/callback', '/test') || 'N/A'}`
-            );
-            resolve(server!);
-          });
-
-          server.on('error', reject);
+        server = app.listen(port, () => {
+          console.log(
+            `🌐 OAuth callback server running on http://localhost:${port}\n` +
+              `🔗 Test URL: http://localhost:${port}/test\n` +
+              `📥 Callback URL: http://localhost:${port}/callback\n` +
+              `🌍 ANAF callback URL: ${process.env.ANAF_CALLBACK_URL || 'Not set'}\n` +
+              `🔗 Test ngrok: ${process.env.ANAF_CALLBACK_URL?.replace('/callback', '/test') || 'N/A'}`
+          );
+          resolve(server!);
         });
-        if (error) {
-          reject(error);
-        }
-        return data;
+
+        server.on('error', reject);
       });
     },
 

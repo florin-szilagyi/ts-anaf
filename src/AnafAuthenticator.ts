@@ -55,17 +55,19 @@ export class AnafAuthenticator {
       token_content_type: 'jwt',
     });
 
-    const { data, error } = tryCatch(async () => {
-      const response = await this.httpClient.post<TokenResponse>(OAUTH_TOKEN_URL, formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const response = await this.httpClient.post<TokenResponse>(OAUTH_TOKEN_URL, formData, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
 
-      if (!response.data?.access_token) {
-        throw new AnafAuthenticationError('Token response missing access token');
-      }
+        if (!response.data?.access_token) {
+          throw new AnafAuthenticationError('Token response missing access token');
+        }
 
-      return response.data;
-    });
+        return response.data;
+      })()
+    );
 
     if (error) {
       throw new AnafAuthenticationError('Failed to exchange authorization code for tokens');
@@ -91,17 +93,19 @@ export class AnafAuthenticator {
       token_content_type: 'jwt',
     });
 
-    const { data, error } = tryCatch(async () => {
-      const response = await this.httpClient.post<TokenResponse>(OAUTH_TOKEN_URL, formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const response = await this.httpClient.post<TokenResponse>(OAUTH_TOKEN_URL, formData, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
 
-      if (!response.data?.access_token) {
-        throw new AnafAuthenticationError('Token response missing access token');
-      }
+        if (!response.data?.access_token) {
+          throw new AnafAuthenticationError('Token response missing access token');
+        }
 
-      return response.data;
-    });
+        return response.data;
+      })()
+    );
 
     if (error) {
       throw new AnafAuthenticationError('Failed to refresh access token');

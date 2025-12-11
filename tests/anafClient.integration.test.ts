@@ -105,13 +105,15 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
       accessToken = tokens.access_token;
       console.log('✅ Using existing valid access token');
     } else if (tokens?.refresh_token) {
-      const { data, error } = tryCatch(async () => {
-        console.log('🔄 Refreshing expired token...');
-        const newTokens = await authenticator.refreshAccessToken(tokens.refresh_token);
-        accessToken = newTokens.access_token;
-        await saveTokens(newTokens);
-        console.log('✅ Token refreshed successfully');
-      });
+      const { data, error } = await tryCatch(
+        (async () => {
+          console.log('🔄 Refreshing expired token...');
+          const newTokens = await authenticator.refreshAccessToken(tokens.refresh_token);
+          accessToken = newTokens.access_token;
+          await saveTokens(newTokens);
+          console.log('✅ Token refreshed successfully');
+        })()
+      );
       if (error) {
         console.log('❌ Token refresh failed, need new authentication');
         throw new Error('Integration tests require valid OAuth tokens. Run auth tests first.');
@@ -209,12 +211,12 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
 
   describe('Message Listing Operations', () => {
     test('should get recent messages', async () => {
-      const { data: messagesPromise, error } = tryCatch(async () => {
-        return await client.getMessages({
+      const { data: messages, error } = await tryCatch(
+        client.getMessages({
           zile: 7,
           filtru: undefined, // Get all message types
-        });
-      });
+        })
+      );
 
       if (error) {
         // Expected when no messages exist
@@ -225,8 +227,6 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
         }
         throw error;
       }
-
-      const messages = await messagesPromise;
 
       expect(messages).toBeDefined();
       expect(messages.titlu).toBeDefined();
@@ -248,14 +248,14 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
       const endTime = Date.now();
       const startTime = endTime - 30 * 24 * 60 * 60 * 1000; // Last 30 days
 
-      const { data: paginatedMessagesPromise, error } = tryCatch(async () => {
-        return await client.getMessagesPaginated({
+      const { data: paginatedMessages, error } = await tryCatch(
+        client.getMessagesPaginated({
           startTime,
           endTime,
           pagina: 1,
           filtru: undefined,
-        });
-      });
+        })
+      );
 
       if (error) {
         // Expected when no messages exist
@@ -266,8 +266,6 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
         }
         throw error;
       }
-
-      const paginatedMessages = await paginatedMessagesPromise;
 
       expect(paginatedMessages).toBeDefined();
       expect(paginatedMessages.titlu).toBeDefined();
@@ -283,9 +281,7 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
   describe('Document Download Operations', () => {
     test('should handle download request (may not have content)', async () => {
       // Try to find a message with download ID
-      const { data: messagesPromise, error: getMessagesError } = tryCatch(async () => {
-        return await client.getMessages({ zile: 30 });
-      });
+      const { data: messages, error: getMessagesError } = await tryCatch(client.getMessages({ zile: 30 }));
 
       if (getMessagesError) {
         // Expected when no messages exist
@@ -297,21 +293,17 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
         throw getMessagesError;
       }
 
-      const messages = await messagesPromise;
-
       if (messages.mesaje && messages.mesaje.length > 0) {
         const messageWithId = messages.mesaje.find((m) => m.id);
 
         if (messageWithId?.id) {
-          const { error } = tryCatch(async () => {
-            const downloadContent = await client.downloadDocument(messageWithId.id);
-            expect(downloadContent).toBeDefined();
-            console.log(`✅ Download successful for message ${messageWithId.id}`);
-          });
+          const { error } = await tryCatch(client.downloadDocument(messageWithId.id));
           if (error) {
             // Download may fail if no content available - this is expected
             console.log(`ℹ️ Download failed for message ${messageWithId.id} - likely no content available`);
             expect(error).toBeInstanceOf(AnafApiError);
+          } else {
+            console.log(`✅ Download successful for message ${messageWithId.id}`);
           }
         } else {
           console.log('ℹ️ No messages with download IDs found');
@@ -494,11 +486,7 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
     test('should handle invalid XML gracefully', async () => {
       const invalidXml = 'This is not XML at all';
 
-      const { data: resultPromise, error } = tryCatch(async () => {
-        return await client.uploadDocument(invalidXml);
-      });
-
-      const result = await resultPromise;
+      const { data: result, error } = await tryCatch(client.uploadDocument(invalidXml));
 
       // Invalid XML should either throw an error or return error response
       if (error) {
@@ -583,27 +571,29 @@ describeIntegration('AnafEfacturaClient Integration Tests', () => {
 
   // Helper functions
   async function loadTokens(): Promise<(TokenResponse & { obtained_at?: number; expires_at?: number }) | null> {
-    const { data, error } = tryCatch(async () => {
-      // Check if file exists
-      if (!fs.existsSync(tokenFilePath)) {
-        return null;
-      }
+    const { data, error } = await tryCatch(
+      (async () => {
+        // Check if file exists
+        if (!fs.existsSync(tokenFilePath)) {
+          return null;
+        }
 
-      const tokenData = fs.readFileSync(tokenFilePath, 'utf8');
+        const tokenData = fs.readFileSync(tokenFilePath, 'utf8');
 
-      // Check if file is empty or contains only whitespace
-      if (!tokenData || tokenData.trim().length === 0) {
-        return null;
-      }
+        // Check if file is empty or contains only whitespace
+        if (!tokenData || tokenData.trim().length === 0) {
+          return null;
+        }
 
-      // Try to parse JSON
-      try {
-        return JSON.parse(tokenData);
-      } catch (parseError) {
-        console.log('⚠️ Invalid JSON in token file, ignoring...');
-        return null;
-      }
-    });
+        // Try to parse JSON
+        try {
+          return JSON.parse(tokenData);
+        } catch (parseError) {
+          console.log('⚠️ Invalid JSON in token file, ignoring...');
+          return null;
+        }
+      })()
+    );
     if (error) {
       console.log('Could not load tokens:', error);
     }

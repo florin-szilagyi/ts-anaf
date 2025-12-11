@@ -143,17 +143,19 @@ export class AnafEfacturaClient {
     const params = buildUploadParams(this.config.vatNumber, options);
     const url = `${UPLOAD_PATH}?${params.toString()}`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.post<string>(url, xmlContent, {
-        headers: {
-          'Content-Type': 'application/xml',
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.post<string>(url, xmlContent, {
+          headers: {
+            'Content-Type': 'application/xml',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      return parseUploadResponse(response.data);
-    });
+        return parseUploadResponse(response.data);
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to upload document');
@@ -181,17 +183,19 @@ export class AnafEfacturaClient {
     const params = buildUploadParams(this.config.vatNumber, options);
     const url = `${UPLOAD_B2C_PATH}?${params.toString()}`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.post<string>(url, xmlContent, {
-        headers: {
-          'Content-Type': 'application/xml',
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.post<string>(url, xmlContent, {
+          headers: {
+            'Content-Type': 'application/xml',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      return parseUploadResponse(response.data);
-    });
+        return parseUploadResponse(response.data);
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to upload B2C document');
@@ -221,16 +225,18 @@ export class AnafEfacturaClient {
     const params = buildStatusParams(uploadId);
     const url = `${STATUS_MESSAGE_PATH}?${params.toString()}`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.get<string>(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.get<string>(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      return parseStatusResponse(response.data);
-    });
+        return parseStatusResponse(response.data);
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to get upload status');
@@ -259,16 +265,18 @@ export class AnafEfacturaClient {
     const params = buildDownloadParams(downloadId);
     const url = `${DOWNLOAD_PATH}?${params.toString()}`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.get<string>(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.get<string>(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      return response.data;
-    });
+        return response.data;
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to download document');
@@ -304,22 +312,24 @@ export class AnafEfacturaClient {
     );
     const url = `${LIST_MESSAGES_PAGINATED_PATH}?${queryParams.toString()}`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.get(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.get(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      const data = parseJsonResponse<PaginatedListMessagesResponse>(response.data);
+        const data = parseJsonResponse<PaginatedListMessagesResponse>(response.data);
 
-      if (isErrorResponse(data)) {
-        throw new AnafApiError(extractErrorMessage(data) || 'Error retrieving paginated messages');
-      }
+        if (isErrorResponse(data)) {
+          throw new AnafApiError(extractErrorMessage(data) || 'Error retrieving paginated messages');
+        }
 
-      return data;
-    });
+        return data;
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to get paginated messages');
@@ -346,22 +356,24 @@ export class AnafEfacturaClient {
     const queryParams = buildListMessagesParams(this.config.vatNumber, params.zile, params.filtru);
     const url = `${LIST_MESSAGES_PATH}?${queryParams.toString()}`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.get(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.get(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      const data = parseJsonResponse<ListMessagesResponse>(response.data);
+        const data = parseJsonResponse<ListMessagesResponse>(response.data);
 
-      if (isErrorResponse(data)) {
-        throw new AnafApiError(extractErrorMessage(data) || 'Error retrieving messages');
-      }
+        if (isErrorResponse(data)) {
+          throw new AnafApiError(extractErrorMessage(data) || 'Error retrieving messages');
+        }
 
-      return data;
-    });
+        return data;
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to get messages');
@@ -392,25 +404,27 @@ export class AnafEfacturaClient {
 
     const url = `validare/${standard}`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.post(url, xmlContent, {
-        headers: {
-          'Content-Type': 'text/plain',
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.post(url, xmlContent, {
+          headers: {
+            'Content-Type': 'text/plain',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      const responseData = parseJsonResponse(response.data);
+        const responseData = parseJsonResponse(response.data);
 
-      return {
-        valid: responseData.stare === 'ok',
-        details: responseData.Messages
-          ? responseData.Messages.map((m: any) => m.message).join('\n')
-          : `Validation ${responseData.stare === 'ok' ? 'passed' : 'failed'}`,
-        info: `Validation performed using ${standard} standard (trace_id: ${responseData.trace_id})`,
-      };
-    });
+        return {
+          valid: responseData.stare === 'ok',
+          details: responseData.Messages
+            ? responseData.Messages.map((m: any) => m.message).join('\n')
+            : `Validation ${responseData.stare === 'ok' ? 'passed' : 'failed'}`,
+          info: `Validation performed using ${standard} standard (trace_id: ${responseData.trace_id})`,
+        };
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to validate XML');
@@ -472,22 +486,24 @@ export class AnafEfacturaClient {
       throw new AnafValidationError('Invalid signature file type. Expected File or Buffer');
     }
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.post(url, formData, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.post(url, formData, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      const responseData = response.data;
-      const msg = responseData.msg || '';
+        const responseData = response.data;
+        const msg = responseData.msg || '';
 
-      return {
-        valid: msg.includes('validate cu succes') && !msg.includes('NU'),
-        details: msg,
-      };
-    });
+        return {
+          valid: msg.includes('validate cu succes') && !msg.includes('NU'),
+          details: msg,
+        };
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to validate signature');
@@ -514,31 +530,33 @@ export class AnafEfacturaClient {
 
     const url = `transformare/${standard}`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.post(url, xmlContent, {
-        headers: {
-          'Content-Type': 'text/plain',
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.post(url, xmlContent, {
+          headers: {
+            'Content-Type': 'text/plain',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      // Check if response is JSON (error) or binary (PDF)
-      if (response.headers?.get('content-type')?.includes('application/json')) {
-        const errorData = parseJsonResponse(response.data);
-        throw new AnafApiError(
-          errorData.Messages ? errorData.Messages.map((m: any) => m.message).join('\n') : 'PDF conversion failed'
-        );
-      }
+        // Check if response is JSON (error) or binary (PDF)
+        if (response.headers?.get('content-type')?.includes('application/json')) {
+          const errorData = parseJsonResponse(response.data);
+          throw new AnafApiError(
+            errorData.Messages ? errorData.Messages.map((m: any) => m.message).join('\n') : 'PDF conversion failed'
+          );
+        }
 
-      // Return PDF binary data
-      if (response.data instanceof ArrayBuffer) {
-        return Buffer.from(response.data);
-      } else {
-        // Fallback for when content-type detection doesn't work
-        return Buffer.from(response.data as any);
-      }
-    });
+        // Return PDF binary data
+        if (response.data instanceof ArrayBuffer) {
+          return Buffer.from(response.data);
+        } else {
+          // Fallback for when content-type detection doesn't work
+          return Buffer.from(response.data as any);
+        }
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to convert XML to PDF');
@@ -568,31 +586,33 @@ export class AnafEfacturaClient {
 
     const url = `transformare/${standard}/DA`;
 
-    const { data, error } = tryCatch(async () => {
-      const accessToken = await this.getValidAccessToken();
-      const response = await this.httpClient.post(url, xmlContent, {
-        headers: {
-          'Content-Type': 'text/plain',
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+    const { data, error } = await tryCatch(
+      (async () => {
+        const accessToken = await this.getValidAccessToken();
+        const response = await this.httpClient.post(url, xmlContent, {
+          headers: {
+            'Content-Type': 'text/plain',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-      // Check if response is JSON (error) or binary (PDF)
-      if (response.headers?.get('content-type')?.includes('application/json')) {
-        const errorData = parseJsonResponse(response.data);
-        throw new AnafApiError(
-          errorData.Messages ? errorData.Messages.map((m: any) => m.message).join('\n') : 'PDF conversion failed'
-        );
-      }
+        // Check if response is JSON (error) or binary (PDF)
+        if (response.headers?.get('content-type')?.includes('application/json')) {
+          const errorData = parseJsonResponse(response.data);
+          throw new AnafApiError(
+            errorData.Messages ? errorData.Messages.map((m: any) => m.message).join('\n') : 'PDF conversion failed'
+          );
+        }
 
-      // Return PDF binary data
-      if (response.data instanceof ArrayBuffer) {
-        return Buffer.from(response.data);
-      } else {
-        // Fallback for when content-type detection doesn't work
-        return Buffer.from(response.data as any);
-      }
-    });
+        // Return PDF binary data
+        if (response.data instanceof ArrayBuffer) {
+          return Buffer.from(response.data);
+        } else {
+          // Fallback for when content-type detection doesn't work
+          return Buffer.from(response.data as any);
+        }
+      })()
+    );
 
     if (error) {
       this.handleApiError(error, 'Failed to convert XML to PDF without validation');
