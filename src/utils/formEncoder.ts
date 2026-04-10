@@ -31,14 +31,18 @@ export function buildQueryString(obj: Record<string, unknown>): string {
 }
 
 /**
- * Encode OAuth token request data
- * @param params OAuth parameters
+ * Encode OAuth token request body.
+ *
+ * Per ANAF documentation, client credentials are sent via Basic Auth header
+ * (handled by the caller), so client_id/client_secret are NOT included in
+ * the form body. Only grant_type, code/refresh_token, redirect_uri, and
+ * token_content_type go in the body.
+ *
+ * @param params OAuth parameters (body-only fields)
  * @returns Encoded form data
  */
 export function encodeOAuthTokenRequest(params: {
   grant_type: string;
-  client_id: string;
-  client_secret: string;
   redirect_uri: string;
   code?: string;
   refresh_token?: string;
@@ -46,8 +50,6 @@ export function encodeOAuthTokenRequest(params: {
 }): string {
   const data: Record<string, string> = {
     grant_type: params.grant_type,
-    client_id: params.client_id,
-    client_secret: params.client_secret,
     redirect_uri: params.redirect_uri,
   };
 
@@ -64,6 +66,19 @@ export function encodeOAuthTokenRequest(params: {
   }
 
   return encodeForm(data);
+}
+
+/**
+ * Build HTTP Basic Auth header value from client credentials.
+ * Per ANAF OAuth docs: "Client Authentication de tipul: Send as Basic Auth header"
+ *
+ * @param clientId OAuth client ID
+ * @param clientSecret OAuth client secret
+ * @returns Basic Auth header value (e.g., "Basic dXNlcjpwYXNz")
+ */
+export function buildBasicAuthHeader(clientId: string, clientSecret: string): string {
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  return `Basic ${credentials}`;
 }
 
 /**

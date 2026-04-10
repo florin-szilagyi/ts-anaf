@@ -11,7 +11,7 @@ import {
   StatusResponse,
   TokenResponse,
 } from './types';
-import { AnafSdkError, AnafApiError, AnafValidationError, AnafAuthenticationError } from './errors';
+import { AnafSdkError, AnafApiError, AnafValidationError, AnafAuthenticationError, AnafRateLimitError } from './errors';
 import {
   getBasePath,
   UPLOAD_PATH,
@@ -86,6 +86,7 @@ export class AnafEfacturaClient {
   private currentAccessToken?: string;
   private accessTokenExpiresAt?: number;
   private refreshToken: string;
+  private tokenRefreshPromise: Promise<void> | null = null;
 
   /**
    * Create a new ANAF e-Factura client
@@ -603,7 +604,8 @@ export class AnafEfacturaClient {
   // ==========================================================================
 
   /**
-   * Get a valid access token, refreshing if necessary
+   * Get a valid access token, refreshing if necessary.
+   * Uses promise coalescing so concurrent requests share a single in-flight refresh.
    * @returns A valid access token
    * @throws {AnafAuthenticationError} If token refresh fails
    */
@@ -613,8 +615,18 @@ export class AnafEfacturaClient {
       return this.currentAccessToken!;
     }
 
-    // Refresh the token
-    await this.refreshAccessToken();
+    // If a refresh is already in flight, wait for it instead of starting another
+    if (this.tokenRefreshPromise) {
+      await this.tokenRefreshPromise;
+      return this.currentAccessToken!;
+    }
+
+    // Start a new refresh and store the promise so concurrent callers can join
+    this.tokenRefreshPromise = this.refreshAccessToken().finally(() => {
+      this.tokenRefreshPromise = null;
+    });
+
+    await this.tokenRefreshPromise;
     return this.currentAccessToken!;
   }
 

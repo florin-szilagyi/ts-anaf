@@ -34,6 +34,10 @@ interface TaxGroup {
 
 /**
  * Build party XML structure for supplier or customer
+ *
+ * Element ordering follows UBL 2.1 / CIUS-RO schema sequence:
+ * PartyIdentification → PartyName → PostalAddress → PartyTaxScheme → PartyLegalEntity → Contact
+ *
  * @param root XML root element
  * @param tagName Tag name (cac:AccountingSupplierParty or cac:AccountingCustomerParty)
  * @param party Party information
@@ -41,6 +45,24 @@ interface TaxGroup {
 function buildPartyXml(root: XMLBuilder, tagName: string, party: Party): void {
   const partyElement = root.ele(tagName).ele('cac:Party');
   const address = party.address;
+
+  // Party Identification (optional supplementary ID)
+  if (party.partyIdentificationId) {
+    partyElement
+      .ele('cac:PartyIdentification')
+      .ele('cbc:ID')
+      .txt(party.partyIdentificationId)
+      .up()
+      .up();
+  }
+
+  // Party Name
+  partyElement
+    .ele('cac:PartyName')
+    .ele('cbc:Name')
+    .txt(party.registrationName)
+    .up()
+    .up();
 
   // Postal Address
   partyElement
@@ -64,18 +86,7 @@ function buildPartyXml(root: XMLBuilder, tagName: string, party: Party): void {
     .up()
     .up();
 
-  // Party Legal Entity
-  partyElement
-    .ele('cac:PartyLegalEntity')
-    .ele('cbc:RegistrationName')
-    .txt(party.registrationName)
-    .up()
-    .ele('cbc:CompanyID')
-    .txt(party.companyId)
-    .up()
-    .up();
-
-  // Party Tax Scheme (if VAT number provided)
+  // Party Tax Scheme (if VAT number provided) — must come before PartyLegalEntity
   if (party.vatNumber) {
     partyElement
       .ele('cac:PartyTaxScheme')
@@ -88,6 +99,29 @@ function buildPartyXml(root: XMLBuilder, tagName: string, party: Party): void {
       .up()
       .up()
       .up();
+  }
+
+  // Party Legal Entity
+  partyElement
+    .ele('cac:PartyLegalEntity')
+    .ele('cbc:RegistrationName')
+    .txt(party.registrationName)
+    .up()
+    .ele('cbc:CompanyID')
+    .txt(party.companyId)
+    .up()
+    .up();
+
+  // Contact (optional)
+  if (party.email || party.telephone) {
+    const contactElement = partyElement.ele('cac:Contact');
+    if (party.telephone) {
+      contactElement.ele('cbc:Telephone').txt(party.telephone).up();
+    }
+    if (party.email) {
+      contactElement.ele('cbc:ElectronicMail').txt(party.email).up();
+    }
+    contactElement.up();
   }
 }
 
@@ -326,8 +360,11 @@ export function buildInvoiceXml(input: InvoiceInput): string {
     'xmlns:cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
   });
 
-  // Invoice header
+  // Invoice header — element ordering follows UBL 2.1 schema
   root
+    .ele('cbc:UBLVersionID')
+    .txt('2.1')
+    .up()
     .ele('cbc:CustomizationID')
     .txt(UBL_CUSTOMIZATION_ID)
     .up()
@@ -342,10 +379,25 @@ export function buildInvoiceXml(input: InvoiceInput): string {
     .up()
     .ele('cbc:InvoiceTypeCode')
     .txt(INVOICE_TYPE_CODE)
-    .up()
-    .ele('cbc:DocumentCurrencyCode')
-    .txt(currency)
     .up();
+
+  // Note (optional)
+  if (input.note) {
+    root.ele('cbc:Note').txt(input.note).up();
+  }
+
+  root.ele('cbc:DocumentCurrencyCode').txt(currency).up();
+
+  // Invoice Period (optional)
+  if (input.invoicePeriodEndDate) {
+    const periodEndDate = formatDateForAnaf(input.invoicePeriodEndDate);
+    root
+      .ele('cac:InvoicePeriod')
+      .ele('cbc:EndDate')
+      .txt(periodEndDate)
+      .up()
+      .up();
+  }
 
   // Parties
   buildPartyXml(root, 'cac:AccountingSupplierParty', input.supplier);
@@ -356,8 +408,8 @@ export function buildInvoiceXml(input: InvoiceInput): string {
     root
       .ele('cac:PaymentMeans')
       .ele('cbc:PaymentMeansCode')
-      .txt('30')
-      .up() // Credit transfer
+      .txt('31')
+      .up() // SEPA Credit transfer (UN/ECE 4461)
       .ele('cac:PayeeFinancialAccount')
       .ele('cbc:ID')
       .txt(input.paymentIban)

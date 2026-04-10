@@ -34,7 +34,7 @@ export function parseUploadResponse(xmlString: string): UploadResponse {
   });
 
   if (error) {
-    throw new AnafXmlParsingError('Failed to parse XML response', xmlString);
+    throw new AnafXmlParsingError('Failed to parse XML response', truncateForError(xmlString));
   }
 
   // Try to parse using grouped structure first
@@ -45,7 +45,15 @@ export function parseUploadResponse(xmlString: string): UploadResponse {
   result = tryParseUploadStructure(doc.simple);
   if (result) return result;
 
-  throw new AnafXmlParsingError('Unknown or unexpected XML response structure', xmlString);
+  throw new AnafXmlParsingError('Unknown or unexpected XML response structure', truncateForError(xmlString));
+}
+
+/**
+ * Truncate a response string for inclusion in error objects to avoid memory bloat
+ */
+function truncateForError(str: string, maxLength: number = 500): string {
+  if (!str || str.length <= maxLength) return str;
+  return str.substring(0, maxLength) + '... [truncated]';
 }
 
 /**
@@ -102,7 +110,7 @@ export function parseStatusResponse(xmlString: string): StatusResponse {
   });
 
   if (error) {
-    throw new AnafXmlParsingError('Failed to parse XML response', xmlString);
+    throw new AnafXmlParsingError('Failed to parse XML response', truncateForError(xmlString));
   }
 
   // Try to parse using grouped structure first
@@ -113,7 +121,7 @@ export function parseStatusResponse(xmlString: string): StatusResponse {
   result = tryParseStatusStructure(doc.simple);
   if (result) return result;
 
-  throw new AnafXmlParsingError('Unknown or unexpected XML response structure', xmlString);
+  throw new AnafXmlParsingError('Unknown or unexpected XML response structure', truncateForError(xmlString));
 }
 
 /**
@@ -200,12 +208,14 @@ function extractTextValue(element: any): string {
 }
 
 /**
- * Recursively search for errorMessage in an object structure
+ * Recursively search for errorMessage in an object structure.
+ * Has a depth limit to prevent stack overflow on deeply nested or circular structures.
  * @param obj Object to search in
+ * @param depth Current recursion depth (internal)
  * @returns Found error message or null
  */
-function findErrorMessage(obj: any): string | null {
-  if (!obj || typeof obj !== 'object') {
+function findErrorMessage(obj: any, depth: number = 0): string | null {
+  if (!obj || typeof obj !== 'object' || depth > 10) {
     return null;
   }
 
@@ -227,7 +237,7 @@ function findErrorMessage(obj: any): string | null {
 
     // Recursively search in nested objects
     if (typeof value === 'object' && value !== null) {
-      const found = findErrorMessage(value);
+      const found = findErrorMessage(value, depth + 1);
       if (found) {
         return found;
       }
@@ -250,7 +260,7 @@ export function parseJsonResponse<T = any>(response: any): T {
     });
 
     if (error) {
-      throw new AnafXmlParsingError('Failed to parse JSON response', response);
+      throw new AnafXmlParsingError('Failed to parse JSON response', truncateForError(response));
     }
 
     return data;

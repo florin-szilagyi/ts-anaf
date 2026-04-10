@@ -1,4 +1,4 @@
-import { AnafApiError, AnafAuthenticationError, AnafNotFoundError, AnafValidationError } from '../errors';
+import { AnafApiError, AnafAuthenticationError, AnafNotFoundError, AnafRateLimitError, AnafValidationError } from '../errors';
 import { tryCatch } from '../tryCatch';
 
 interface HttpOptions extends RequestInit {
@@ -41,20 +41,12 @@ export class HttpClient {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     const { data, error } = tryCatch(async () => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[HTTP] ${fetchOptions.method || 'GET'} ${fullUrl}`);
-      }
-
       const response = await fetch(fullUrl, {
         ...fetchOptions,
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[HTTP] Response ${response.status} for ${fullUrl}`);
-      }
 
       // Handle HTTP errors
       if (!response.ok) {
@@ -84,6 +76,7 @@ export class HttpClient {
       if (
         error instanceof AnafApiError ||
         error instanceof AnafAuthenticationError ||
+        error instanceof AnafRateLimitError ||
         error instanceof AnafValidationError
       ) {
         throw error;
@@ -156,6 +149,8 @@ export class HttpClient {
       throw new AnafAuthenticationError(message);
     } else if (status === 404) {
       throw new AnafNotFoundError(message);
+    } else if (status === 429) {
+      throw new AnafRateLimitError();
     } else if (status >= 400 && status < 500) {
       throw new AnafValidationError(message);
     } else {

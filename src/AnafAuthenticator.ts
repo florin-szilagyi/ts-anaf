@@ -1,7 +1,7 @@
 import { AnafAuthConfig, TokenResponse } from './types';
 import { AnafAuthenticationError, AnafValidationError } from './errors';
 import { OAUTH_AUTHORIZE_URL, OAUTH_TOKEN_URL } from './constants';
-import { buildOAuthAuthorizationUrl, encodeOAuthTokenRequest } from './utils/formEncoder';
+import { buildOAuthAuthorizationUrl, encodeOAuthTokenRequest, buildBasicAuthHeader } from './utils/formEncoder';
 import { HttpClient } from './utils/httpClient';
 import { tryCatch } from './tryCatch';
 
@@ -48,8 +48,6 @@ export class AnafAuthenticator {
 
     const formData = encodeOAuthTokenRequest({
       grant_type: 'authorization_code',
-      client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
       redirect_uri: this.config.redirectUri,
       code,
       token_content_type: 'jwt',
@@ -57,7 +55,10 @@ export class AnafAuthenticator {
 
     const { data, error } = tryCatch(async () => {
       const response = await this.httpClient.post<TokenResponse>(OAUTH_TOKEN_URL, formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: buildBasicAuthHeader(this.config.clientId, this.config.clientSecret),
+        },
       });
 
       if (!response.data?.access_token) {
@@ -68,7 +69,10 @@ export class AnafAuthenticator {
     });
 
     if (error) {
-      throw new AnafAuthenticationError('Failed to exchange authorization code for tokens');
+      if (error instanceof AnafAuthenticationError) throw error;
+      throw new AnafAuthenticationError(
+        `Failed to exchange authorization code: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
 
     return data;
@@ -84,8 +88,6 @@ export class AnafAuthenticator {
 
     const formData = encodeOAuthTokenRequest({
       grant_type: 'refresh_token',
-      client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
       redirect_uri: this.config.redirectUri,
       refresh_token: refreshToken,
       token_content_type: 'jwt',
@@ -93,7 +95,10 @@ export class AnafAuthenticator {
 
     const { data, error } = tryCatch(async () => {
       const response = await this.httpClient.post<TokenResponse>(OAUTH_TOKEN_URL, formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: buildBasicAuthHeader(this.config.clientId, this.config.clientSecret),
+        },
       });
 
       if (!response.data?.access_token) {
@@ -104,7 +109,10 @@ export class AnafAuthenticator {
     });
 
     if (error) {
-      throw new AnafAuthenticationError('Failed to refresh access token');
+      if (error instanceof AnafAuthenticationError) throw error;
+      throw new AnafAuthenticationError(
+        `Failed to refresh access token: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
 
     return data;

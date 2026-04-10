@@ -163,6 +163,22 @@ export const UBL_CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017#compliant#urn:efact
 export const INVOICE_TYPE_CODE = '380';
 
 // =============================================================================
+// Token Validity (per ANAF documentation)
+// =============================================================================
+
+/** Access token JWT validity in days (90 days / 129,600 minutes) */
+export const ACCESS_TOKEN_VALIDITY_DAYS = 90;
+
+/** Refresh token validity in days */
+export const REFRESH_TOKEN_VALIDITY_DAYS = 365;
+
+/** Authorization code must be exchanged within this many seconds */
+export const AUTH_CODE_WINDOW_SECONDS = 60;
+
+/** ANAF API rate limit: max requests per minute */
+export const RATE_LIMIT_REQUESTS_PER_MINUTE = 1000;
+
+// =============================================================================
 // Helper Functions for URL Construction
 // =============================================================================
 

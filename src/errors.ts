@@ -39,6 +39,13 @@ export class AnafApiError extends AnafSdkError {
   }
 }
 
+export class AnafRateLimitError extends AnafSdkError {
+  constructor(message: string = 'Rate limit exceeded. ANAF allows 1000 requests per minute.') {
+    super(message);
+    Object.setPrototypeOf(this, AnafRateLimitError.prototype);
+  }
+}
+
 export class AnafXmlParsingError extends AnafSdkError {
   public rawResponse?: string;
 

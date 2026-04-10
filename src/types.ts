@@ -252,6 +252,12 @@ export interface Party {
   vatNumber?: string;
   /** Company address */
   address: Address;
+  /** Contact email address */
+  email?: string;
+  /** Contact telephone number */
+  telephone?: string;
+  /** Party identification ID (supplementary ID, e.g. internal reference) */
+  partyIdentificationId?: string;
 }
 
 /**
@@ -284,6 +290,10 @@ export interface InvoiceInput {
   dueDate?: string | Date;
   /** Currency code (default: 'RON') */
   currency?: string;
+  /** Invoice note / description */
+  note?: string;
+  /** Invoice period end date */
+  invoicePeriodEndDate?: string | Date;
   /** Supplier information */
   supplier: Party;
   /** Customer information */
@@ -348,8 +358,14 @@ export interface ApiResponse<T = any> {
 export interface AnafDetailsConfig {
   /** Request timeout in milliseconds (default: 30000) */
   timeout?: number;
-  /** ANAF API URL */
+  /** ANAF API URL for company data (sync) */
   url?: string;
+  /** ANAF e-Factura registry interrogation URL */
+  efacturaRegistryUrl?: string;
+  /** ANAF async API URL for submitting requests (POST) */
+  asyncUrl?: string;
+  /** ANAF async API URL for fetching results (GET) */
+  asyncResultUrl?: string;
 }
 
 /**
@@ -370,6 +386,25 @@ export interface AnafCompanyData {
   contactPhone: string;
   /** Whether company is VAT registered */
   scpTva: boolean;
+  /** e-Factura registry information (if available) */
+  efacturaRegistry?: {
+    /** Whether the company is registered in the e-Factura registry */
+    registered: boolean;
+    /** Registry name */
+    registru?: string;
+    /** Taxpayer category */
+    categorie?: string;
+    /** Date of registration */
+    dataInscriere?: string;
+    /** Date of voluntary withdrawal */
+    dataRenuntare?: string | null;
+    /** Date of deregistration */
+    dataRadiere?: string | null;
+    /** Date B2G option was expressed */
+    dataOptiuneB2G?: string | null;
+    /** Current state at the requested date */
+    stare?: string;
+  };
 }
 
 /**
@@ -425,6 +460,168 @@ export interface AnafFoundCompany {
 export interface AnafApiResponse {
   found?: AnafFoundCompany[];
   notFound?: { cui: number }[];
+}
+
+// ─── Async ANAF API types (v8) ───────────────────────────────────────────────
+
+/**
+ * Response from the async ANAF API submit endpoint (POST)
+ */
+export interface AnafAsyncSubmitResponse {
+  cod: number;
+  message: string;
+  correlationId: string;
+}
+
+/**
+ * Full company details from the async ANAF API (v8)
+ */
+export interface AnafCompanyFullDetails {
+  date_generale: {
+    cui: number;
+    data: string;
+    denumire: string;
+    adresa: string;
+    nrRegCom: string;
+    telefon: string;
+    fax: string;
+    codPostal: string | null;
+    act: string;
+    stare_inregistrare: string;
+    data_inregistrare: string;
+    cod_CAEN: string;
+    iban: string;
+    statusRO_e_Factura: boolean;
+    organFiscalCompetent: string;
+    forma_de_proprietate: string;
+    forma_organizare: string;
+    forma_juridica: string;
+  };
+  inregistrare_scop_Tva: {
+    scpTVA: boolean;
+    perioade_TVA?: {
+      data_inceput_ScpTVA: string;
+      data_sfarsit_ScpTVA: string;
+      data_anul_imp_ScpTVA: string;
+      mesaj_ScpTVA: string;
+    };
+  };
+  inregistrare_RTVAI: {
+    dataInceputTvaInc: string;
+    dataSfarsitTvaInc: string;
+    dataActualizareTvaInc: string;
+    dataPublicareTvaInc: string;
+    tipActTvaInc: string;
+    statusTvaIncasare: boolean;
+  };
+  stare_inactiv: {
+    dataInactivare: string;
+    dataReactivare: string;
+    dataPublicare: string;
+    dataRadiere: string;
+    statusInactivi: boolean;
+  };
+  inregistrare_SplitTVA: {
+    dataInceputSplitTVA: string;
+    dataAnulareSplitTVA: string;
+    statusSplitTVA: boolean;
+  };
+  adresa_sediu_social: {
+    sdenumire_Strada: string;
+    snumar_Strada: string;
+    sdenumire_Localitate: string;
+    scod_Localitate: string;
+    sdenumire_Judet: string;
+    scod_Judet: string;
+    scod_JudetAuto: string;
+    stara: string;
+    sdetalii_Adresa: string;
+    scod_Postal: string;
+  };
+  adresa_domiciliu_fiscal: {
+    ddenumire_Strada: string;
+    dnumar_Strada: string;
+    ddenumire_Localitate: string;
+    dcod_Localitate: string;
+    ddenumire_Judet: string;
+    dcod_Judet: string;
+    dcod_JudetAuto: string;
+    dtara: string;
+    ddetalii_Adresa: string;
+    dcod_Postal: string;
+  };
+}
+
+/**
+ * Full async API response structure (GET result)
+ */
+export interface AnafAsyncResultResponse {
+  cod: number;
+  message: string;
+  found: AnafCompanyFullDetails[];
+  notFound: { cui: number }[];
+}
+
+/**
+ * Configuration for async polling behavior
+ */
+export interface AnafAsyncPollingConfig {
+  /** Initial delay before first poll in ms (default: 2000, minimum enforced: 2000) */
+  initialDelay?: number;
+  /** Delay between poll retries in ms (default: 3000) */
+  retryDelay?: number;
+  /** Maximum number of poll attempts (default: 10) */
+  maxRetries?: number;
+}
+
+/**
+ * Result from async ANAF company lookup (includes full details)
+ */
+export interface AnafAsyncCompanyResult {
+  success: boolean;
+  /** Simplified company data (same shape as sync API) */
+  data?: AnafCompanyData[];
+  /** Full detailed response from ANAF async API */
+  fullDetails?: AnafCompanyFullDetails[];
+  /** CUIs that were not found */
+  notFound?: number[];
+  error?: string;
+}
+
+/**
+ * e-Factura registry entry returned by the registruroefactura endpoint
+ */
+export interface EFacturaRegistryEntry {
+  /** CUI number */
+  cui: number;
+  /** Company name */
+  denumire: string;
+  /** Registered address */
+  adresa: string;
+  /** Registry name the company is registered in */
+  registru: string;
+  /** Taxpayer category */
+  categorie: string;
+  /** Date of registration in the registry */
+  dataInscriere: string;
+  /** Date of voluntary withdrawal (if applicable) */
+  dataRenuntare: string | null;
+  /** Date of deregistration (if applicable) */
+  dataRadiere: string | null;
+  /** Date the B2G option was expressed (if applicable) */
+  dataOptiuneB2G: string | null;
+  /** Whether the company is currently registered at the requested date */
+  stare: string;
+}
+
+/**
+ * Response from the e-Factura registry interrogation endpoint
+ */
+export interface EFacturaRegistryResponse {
+  /** Companies found in the registry */
+  found: EFacturaRegistryEntry[];
+  /** CUI numbers not found in the registry */
+  notFound: number[];
 }
 
 /**
