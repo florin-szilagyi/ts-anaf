@@ -307,6 +307,31 @@ export interface InvoiceInput {
 }
 
 /**
+ * Shared configuration for all e-Factura clients
+ */
+export interface EfacturaBaseConfig {
+  /** Whether to use test environment (default: false) */
+  testMode?: boolean;
+  /** Request timeout in milliseconds (default: 30000) */
+  timeout?: number;
+  /** Custom base path (overrides default) */
+  basePath?: string;
+}
+
+/**
+ * Configuration for EfacturaClient (core invoice operations)
+ */
+export interface EfacturaClientConfig extends EfacturaBaseConfig {
+  /** Romanian VAT number (CIF) in format RO12345678 */
+  vatNumber: string;
+}
+
+/**
+ * Configuration for EfacturaToolsClient (validation and conversion)
+ */
+export interface EfacturaToolsConfig extends EfacturaBaseConfig {}
+
+/**
  * Legacy interface for backward compatibility
  */
 export interface UblInvoiceInput extends InvoiceInput {

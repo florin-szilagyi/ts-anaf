@@ -38,6 +38,9 @@
  */
 
 // Main exports
+export { EfacturaClient } from './EfacturaClient';
+export { EfacturaToolsClient } from './EfacturaToolsClient';
+export { TokenManager } from './TokenManager';
 export { AnafEfacturaClient } from './AnafClient';
 export { AnafAuthenticator } from './AnafAuthenticator';
 export { AnafDetailsClient } from './AnafDetailsClient';

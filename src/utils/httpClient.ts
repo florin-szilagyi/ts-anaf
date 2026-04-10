@@ -40,7 +40,7 @@ export class HttpClient {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const { data, error } = tryCatch(async () => {
+    const { data, error } = await tryCatch(async () => {
       const response = await fetch(fullUrl, {
         ...fetchOptions,
         signal: controller.signal,

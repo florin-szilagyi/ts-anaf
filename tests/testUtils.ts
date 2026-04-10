@@ -165,7 +165,7 @@ export class TestTokenManager {
   private static tokenFilePath = path.join(process.cwd(), 'token.secret');
 
   static async loadTokens(): Promise<(TokenResponse & { obtained_at?: number; expires_at?: number }) | null> {
-    const { data, error } = tryCatch(async () => {
+    const { data, error } = await tryCatch(async () => {
       if (fs.existsSync(this.tokenFilePath)) {
         const tokenData = fs.readFileSync(this.tokenFilePath, 'utf8');
         return JSON.parse(tokenData);
@@ -189,7 +189,7 @@ export class TestTokenManager {
   }
 
   static async deleteTokens(): Promise<void> {
-    const { data, error } = tryCatch(async () => {
+    const { data, error } = await tryCatch(async () => {
       if (fs.existsSync(this.tokenFilePath)) {
         fs.unlinkSync(this.tokenFilePath);
         console.log('🗑️ Tokens deleted');

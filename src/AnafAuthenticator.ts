@@ -53,7 +53,7 @@ export class AnafAuthenticator {
       token_content_type: 'jwt',
     });
 
-    const { data, error } = tryCatch(async () => {
+    const { data, error } = await tryCatch(async () => {
       const response = await this.httpClient.post<TokenResponse>(OAUTH_TOKEN_URL, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -93,7 +93,7 @@ export class AnafAuthenticator {
       token_content_type: 'jwt',
     });
 
-    const { data, error } = tryCatch(async () => {
+    const { data, error } = await tryCatch(async () => {
       const response = await this.httpClient.post<TokenResponse>(OAUTH_TOKEN_URL, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

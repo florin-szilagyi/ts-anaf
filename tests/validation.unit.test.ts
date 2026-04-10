@@ -37,7 +37,6 @@ describe('ANAF Validation Operations', () => {
     jest.clearAllMocks();
     const auth = new AnafAuthenticator({ clientId: 'id', clientSecret: 'secret', redirectUri: 'uri' });
     client = new AnafEfacturaClient({ vatNumber: 'RO123', testMode: true, refreshToken: 'rt' }, auth);
-    jest.spyOn(client as any, 'getValidAccessToken').mockResolvedValue('mock-access-token');
   });
 
   describe('validateXml', () => {
