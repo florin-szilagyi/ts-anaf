@@ -37,9 +37,14 @@ const fakeCompany = (cui: string, name = 'Acme SRL'): AnafCompanyData => ({
 
 class StubLookupService {
   batchResult: AnafCompanyData[] | Error = [];
+  batchCalls: Array<{ cuis: readonly string[]; opts?: { useCache?: boolean; refreshCache?: boolean } }> = [];
   asyncResult: AnafCompanyData | Error = fakeCompany('12345678');
   validResult = true;
-  async batchGetCompanies(_cuis: readonly string[]): Promise<AnafCompanyData[]> {
+  async batchGetCompanies(
+    cuis: readonly string[],
+    opts?: { useCache?: boolean; refreshCache?: boolean }
+  ): Promise<AnafCompanyData[]> {
+    this.batchCalls.push({ cuis, opts });
     if (this.batchResult instanceof Error) throw this.batchResult;
     return this.batchResult;
   }
@@ -134,5 +139,29 @@ describe('lookupValidateCui', () => {
     await lookupValidateCui({ output: h.json, services: h.services }, 'RO12345678');
     const parsed = JSON.parse(h.stdout.buf);
     expect(parsed.data).toEqual({ cui: 'RO12345678', valid: true });
+  });
+});
+
+describe('lookupCompany cache flag plumbing (P3.4)', () => {
+  it('passes useCache:true and refreshCache:false by default', async () => {
+    const h = harness();
+    h.lookupService.batchResult = [fakeCompany('12345678')];
+    await lookupCompany({ output: h.text, services: h.services }, ['RO12345678'], {});
+    expect(h.lookupService.batchCalls).toHaveLength(1);
+    expect(h.lookupService.batchCalls[0].opts).toEqual({ useCache: true, refreshCache: false });
+  });
+
+  it('passes useCache:false when --no-cache is set (cache:false in opts)', async () => {
+    const h = harness();
+    h.lookupService.batchResult = [fakeCompany('12345678')];
+    await lookupCompany({ output: h.text, services: h.services }, ['RO12345678'], { cache: false });
+    expect(h.lookupService.batchCalls[0].opts).toEqual({ useCache: false, refreshCache: false });
+  });
+
+  it('passes refreshCache:true when --refresh-cache is set', async () => {
+    const h = harness();
+    h.lookupService.batchResult = [fakeCompany('12345678')];
+    await lookupCompany({ output: h.text, services: h.services }, ['RO12345678'], { refreshCache: true });
+    expect(h.lookupService.batchCalls[0].opts).toEqual({ useCache: true, refreshCache: true });
   });
 });
