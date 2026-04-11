@@ -374,8 +374,8 @@ Update this table as workstreams complete. Keep it short — one line per item.
 | --- | --- | --- | --- | --- |
 | P1.1 | Package bootstrap | 🟢 | `2026-04-11-anaf-cli-P1.1.md` | merged in `bdd829d`; D1: esbuild banner removed (0.21 preserves shebang); NITs deferred to P4.1 (regex strictness, `build` script doesn't chain `build:bundle`) |
 | P1.2 | CLI parser scaffold | ⚪ | — | |
-| P1.3 | Output layer | ⚪ | — | |
-| P1.4 | State layer | ⚪ | — | |
+| P1.3 | Output layer | 🟢 | `2026-04-11-anaf-cli-P1.3.md` | merged in `c0e3fb5`; FROZEN API verified; NITs deferred to P1.2 (barrel dispatch test, unknown-throw normalization in bin) |
+| P1.4 | State layer | 🟢 | `2026-04-11-anaf-cli-P1.4.md` | merged in `b515b67`; FROZEN API verified; NITs deferred to v1.1 hardening (atomic writes via tmp+rename, `remove()` cascade ordering) |
 | P1.5 | auth commands | ⚪ | — | |
 | P1.6 | ctx commands | ⚪ | — | |
 | P1.7 | lookup + cache | ⚪ | — | |
@@ -411,6 +411,25 @@ These are the §23 items from the design doc. P1.1's detailed plan must include 
 - Token storage migration path to OS keychain (post-v1; record decision now to avoid lock-in).
 
 These choices ripple through every later workstream — locking them in P1.1 prevents thrash.
+
+---
+
+## 6.5 Deferred NITs Backlog
+
+Tracked here so they don't get lost. None are blockers; each cites the workstream it surfaced in.
+
+**v1.1 hardening (file IO atomicity):**
+- `cli/src/state/configStore.ts` `write()`, `cli/src/state/contextService.ts` `writeFile()`, `cli/src/state/tokenStore.ts` `write()` — replace `writeFileSync` with `writeFileSync(tmp) + renameSync(tmp, final)` to make crashes idempotent. (P1.4)
+- `cli/src/state/contextService.ts` `remove()` — clear `currentContext` BEFORE deleting context/token files so a permissions failure mid-cascade doesn't leave `resolve()` broken. (P1.4)
+- `cli/src/state/contextService.ts` `rename()` — wrap write-new + unlink-old in a try/catch that restores the old file on partial failure. (P1.4)
+
+**Deferred to P4.1:**
+- `cli/package.json` `build` script does not chain `build:bundle`. Wire it in when esbuild becomes the canonical build path. (P1.1)
+- `cli/tests/bin.smoke.test.ts` version regex `/^\d+\.\d+\.\d+$/` rejects pre-release tags (`0.0.0-rc.1`). Loosen when the first pre-release lands. (P1.1)
+
+**Folded into P1.2 (next):**
+- Add `cli/tests/output/index.test.ts` (or equivalent in P1.2's bin tests) to cover the barrel `renderSuccess`/`renderError` dispatch branches. (P1.3)
+- The bin entrypoint MUST normalize unknown throws (`err instanceof Error ? err : new Error(String(err))`) before calling `renderError` / `errorToExit`, since both functions assume an `Error` instance. (P1.3)
 
 ---
 
