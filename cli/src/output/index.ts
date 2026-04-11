@@ -10,6 +10,7 @@ export type {
 
 export { EXIT_CODES, type ExitCode, exitCodeForCategory } from './exitCodes';
 export { CliError, errorToExit, type CliErrorArgs } from './errors';
+export { ERROR_CODES, type KnownErrorCode, isKnownErrorCode } from './errorCodes';
 export { defaultStreams, makeOutputContext } from './context';
 export { writeBinary } from './binary';
 
