@@ -1,5 +1,6 @@
 import { CommanderError } from 'commander';
 import { buildProgram, type ServiceRegistry } from './buildProgram';
+import { ContextService } from '../state';
 import {
   CliError,
   EXIT_CODES,
@@ -94,9 +95,17 @@ export async function runProgram(options: RunProgramOptions): Promise<void> {
     const format = preParseFormat(options.argv);
     output = makeOutputContext({ format, streams });
 
+    // Service-registry merge (FROZEN pattern — P1.6).
+    // Fill every required field from the caller's partial injection, falling
+    // back to a default-constructed service. Downstream workstreams append
+    // new fields here; they MUST NOT change or reorder existing ones.
+    const services: ServiceRegistry = {
+      contextService: options.services?.contextService ?? new ContextService(),
+    };
+
     const program = buildProgram({
       output,
-      services: (options.services ?? {}) as ServiceRegistry,
+      services,
     });
 
     // Make commander throw instead of calling process.exit so we can

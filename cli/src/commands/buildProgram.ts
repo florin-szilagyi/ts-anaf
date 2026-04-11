@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { CLI_NAME, CLI_VERSION } from '../version';
 import type { OutputContext } from '../output';
+import type { ContextService } from '../state';
 import { attachGlobalFlags } from './flags';
 import { registerAuth } from './groups/auth';
 import { registerCtx } from './groups/ctx';
@@ -10,15 +11,24 @@ import { registerUbl } from './groups/ubl';
 import { registerRun } from './groups/run';
 import { registerSchema } from './groups/schema';
 
+/**
+ * Registry of REQUIRED service instances passed into the commander program.
+ *
+ * This shape is the FROZEN service-registry merge pattern: `runProgram` is
+ * responsible for filling every field with a default-constructed service when
+ * callers do not inject one. Every handler can therefore access
+ * `deps.services.<field>` without an existence check.
+ *
+ * Downstream workstreams MUST append new fields here (and a matching default
+ * line in `runProgram.ts`) without removing or reordering existing ones:
+ *   P1.5 → tokenStore: TokenStore; authService: AuthService;
+ *   P1.7 → lookupService: LookupService;
+ *   P2.2 → ublService: UblService;
+ *   P2.4 → efacturaService: EfacturaService;
+ *   P3.1 → manifestService: ManifestService;
+ */
 export interface ServiceRegistry {
-  // Empty in P1.2. Populated incrementally by downstream workstreams:
-  //   contextService?: ContextService    (P1.6)
-  //   tokenStore?: TokenStore            (P1.5)
-  //   authService?: AuthService          (P1.5)
-  //   lookupService?: LookupService      (P1.7)
-  //   ublService?: UblService            (P2.2)
-  //   efacturaService?: EfacturaService  (P2.4)
-  //   manifestService?: ManifestService  (P3.1)
+  contextService: ContextService;
 }
 
 export interface CommandDeps {

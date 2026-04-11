@@ -149,4 +149,24 @@ describe('ContextService', () => {
     expect(err).toBeInstanceOf(CliError);
     expect((err as CliError).code).toBe('NO_CURRENT_CONTEXT');
   });
+
+  it('setCurrent() pins the current context after validating it exists', () => {
+    const paths = freshPaths();
+    const svc = new ContextService({ paths });
+    svc.add(sample('acme-prod'));
+    svc.setCurrent('acme-prod');
+    expect(svc.resolve().name).toBe('acme-prod');
+  });
+
+  it('setCurrent() throws CONTEXT_NOT_FOUND if the named context does not exist', () => {
+    const svc = new ContextService({ paths: freshPaths() });
+    let err: unknown;
+    try {
+      svc.setCurrent('nope');
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).code).toBe('CONTEXT_NOT_FOUND');
+  });
 });

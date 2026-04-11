@@ -137,6 +137,17 @@ export class ContextService {
     }
   }
 
+  /**
+   * Pin the given context as the current one in the config store.
+   *
+   * Validates that the context exists first (via `get`) so the caller gets
+   * a clean `CONTEXT_NOT_FOUND` error instead of writing a dangling pointer.
+   */
+  setCurrent(name: string): void {
+    this.get(name);
+    this.config.setCurrentContext(name);
+  }
+
   resolve(explicit?: string): Context {
     if (explicit) {
       return this.get(explicit);
