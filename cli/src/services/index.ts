@@ -27,3 +27,4 @@ export {
   type EfacturaClientLike,
   type EfacturaToolsClientLike,
 } from './efacturaService';
+export { UblService, type UblServiceOptions, type UblBuildResult } from './ublService';

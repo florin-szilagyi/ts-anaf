@@ -1,7 +1,7 @@
 import { CommanderError } from 'commander';
 import { buildProgram, type ServiceRegistry } from './buildProgram';
 import { ContextService, TokenStore } from '../state';
-import { LookupService, AuthService, EfacturaService } from '../services';
+import { LookupService, AuthService, EfacturaService, UblService } from '../services';
 import {
   CliError,
   EXIT_CODES,
@@ -106,18 +106,21 @@ export async function runProgram(options: RunProgramOptions): Promise<void> {
     // as constructor args. `AuthService` requires both.
     const contextService = options.services?.contextService ?? new ContextService();
     const tokenStore = options.services?.tokenStore ?? new TokenStore();
-    // Hoist `authService` to a local so `efacturaService`'s default
-    // construction sees the same instance exposed through the registry.
-    // Without this the literal would evaluate `options.services?.authService`
-    // twice and default-construct two distinct AuthServices.
+    // Hoist `authService` and `lookupService` to locals so downstream default
+    // constructions (`efacturaService`, `ublService`) see the SAME instances
+    // that are exposed through the registry. Without this, the registry
+    // literal would evaluate `options.services?.authService` twice (etc.) and
+    // default-construct distinct services behind the user's back.
     const authService = options.services?.authService ?? new AuthService({ contextService, tokenStore });
+    const lookupService = options.services?.lookupService ?? new LookupService();
     const services: ServiceRegistry = {
       contextService,
-      lookupService: options.services?.lookupService ?? new LookupService(),
+      lookupService,
       tokenStore,
       authService,
       efacturaService:
         options.services?.efacturaService ?? new EfacturaService({ contextService, tokenStore, authService }),
+      ublService: options.services?.ublService ?? new UblService({ contextService, lookupService }),
     };
 
     const program = buildProgram({
