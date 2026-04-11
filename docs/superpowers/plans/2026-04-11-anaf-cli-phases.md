@@ -385,12 +385,12 @@ Update this table as workstreams complete. Keep it short — one line per item.
 | P2.4 | EfacturaService | 🟢 | `2026-04-11-anaf-cli-P2.4.md` | merged in `6aeb321`; per-call `TokenManager`; refresh token rotation persisted in try/finally; D1: post-split SDK `EfacturaToolsClient` requires a `TokenManager` — validate/signature/pdf are authenticated operations now (impacts P3.3 plan) |
 | P2.5 | efactura cmds | 🟢 | `2026-04-11-anaf-cli-P2.5.md` | merged in `6b0e3e3`; upload/upload-b2c/status/download/messages wired through EfacturaService; validate/sig/pdf still stubs (P3.3); harness sentinel pattern needed for env-var tests |
 | P2.6 | JSON polish + preview release | 🟢 | inline (no separate plan) | merged in `8bbbb67`; 11 golden envelope tests for cross-command consistency; version bumped to `0.1.0-preview.1`; smoke regex loosened (clears P1.1 NIT); W5 closed |
-| P3.1 | Manifest parser | ⚪ | — | |
-| P3.2 | run / dry-run / schema print | ⚪ | — | |
+| P3.1 | Manifest parser | 🟢 | `2026-04-11-anaf-cli-manifest.md` | merged in `108a0ae` (combined with P3.2/P3.6); zod manifestDocumentSchema + apiVersion/kind/generic error dispatch |
+| P3.2 | run / dry-run / schema print | 🟢 | `2026-04-11-anaf-cli-manifest.md` | merged in `108a0ae`; supports ubl.build + efactura.upload (via xmlFile or ublBuild); manifest xmlStdin intentionally rejected |
 | P3.3 | validate / sig / pdf | 🟢 | inline | merged in `d3f99da`; 6 handler tests; P2.4's D1 forced auth-wired tools |
 | P3.4 | Caching controls | 🟢 | inline | merged in `5616fe5`; `--no-cache` / `--refresh-cache` plumbed into lookup company; async lookup intentionally bypasses cache (design) |
 | P3.5 | Error model hardening | 🟢 | inline | merged in `adab551`; ERROR_CODES registry + isKnownErrorCode; category→exit mapping was already complete from P1.3 |
-| P3.6 | Manifest schemas + goldens | ⚪ | — | |
+| P3.6 | Manifest schemas + goldens | 🟢 | `2026-04-11-anaf-cli-manifest.md` | merged in `108a0ae`; hand-crafted JSON Schemas (draft-07); 4 YAML fixtures; zod-to-json-schema deferred to v1.1 |
 | P4.1 | esbuild bundle | ⚪ | — | |
 | P4.2 | Node SEA per platform | ⚪ | — | pin Node version here |
 | P4.3 | GH Release pipeline | ⚪ | — | |
