@@ -379,10 +379,10 @@ Update this table as workstreams complete. Keep it short — one line per item.
 | P1.5 | auth commands | 🟢 | `2026-04-11-anaf-cli-P1.5.md` | merged in `4b4f5e2`; AuthService wraps `AnafAuthenticator`, persists rotation through TokenStore; live ANAF endpoint confirmed via sanity check #7 (HTTP 400 invalid_client → AUTH_FAILED); `auth login` is print-only (browser-open deferred); leaf-level `--context` shadowing workaround for global flag |
 | P1.6 | ctx commands | 🟢 | `2026-04-11-anaf-cli-P1.6.md` | merged in `b76e71d`; established service-registry merge pattern; added `ContextService.setCurrent()` |
 | P1.7 | lookup + cache | 🟢 | `2026-04-11-anaf-cli-P1.7.md` | merged in `bc3d327`; LookupService wraps `AnafDetailsClient` with read-through file cache; D1: SDK's `AnafCompanyResult` is not a discriminated union (workaround with `??` fallbacks) |
-| P2.1 | Action model | ⚪ | — | KEYSTONE — block on this |
+| P2.1 | Action model | 🟢 | `2026-04-11-anaf-cli-P2.1.md` | merged in `7939423`; KEYSTONE shipped; UblBuildAction + EfacturaUploadAction + line parser + override merge + strict zod schemas; 32 tests |
 | P2.2 | UblService | ⚪ | — | |
 | P2.3 | ubl build cmd | ⚪ | — | |
-| P2.4 | EfacturaService | ⚪ | — | |
+| P2.4 | EfacturaService | 🟢 | `2026-04-11-anaf-cli-P2.4.md` | merged in `6aeb321`; per-call `TokenManager`; refresh token rotation persisted in try/finally; D1: post-split SDK `EfacturaToolsClient` requires a `TokenManager` — validate/signature/pdf are authenticated operations now (impacts P3.3 plan) |
 | P2.5 | efactura cmds | ⚪ | — | |
 | P2.6 | JSON polish + preview release | ⚪ | — | preview npm tag |
 | P3.1 | Manifest parser | ⚪ | — | |
