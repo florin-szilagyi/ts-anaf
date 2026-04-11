@@ -1,0 +1,5 @@
+apiVersion: anaf-cli/v1
+kind: WaveHands
+context: acme-prod
+spec:
+  foo: bar

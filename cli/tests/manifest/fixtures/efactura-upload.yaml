@@ -1,0 +1,15 @@
+apiVersion: anaf-cli/v1
+kind: EFacturaUpload
+context: acme-prod
+spec:
+  source:
+    ublBuild:
+      context: acme-prod
+      invoiceNumber: FCT-200
+      issueDate: 2026-04-11
+      customerCui: RO87654321
+      lines:
+        - "Servicii|1|1000|19"
+  upload:
+    standard: UBL
+    isB2C: false

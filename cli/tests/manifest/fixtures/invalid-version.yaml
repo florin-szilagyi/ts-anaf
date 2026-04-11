@@ -1,0 +1,9 @@
+apiVersion: anaf-cli/v999
+kind: UblBuild
+context: acme-prod
+spec:
+  invoiceNumber: FCT-1
+  issueDate: 2026-04-11
+  customerCui: RO87654321
+  lines:
+    - "x|1|100|19"

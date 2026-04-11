@@ -29,32 +29,25 @@ function harness() {
 }
 
 describe('runProgram', () => {
-  it('exits 1 with NOT_IMPLEMENTED for a stub leaf in text mode', async () => {
-    const h = harness();
-    await runProgram({
-      argv: ['node', 'anaf-cli', 'schema', 'print', 'UblBuild'],
-      streams: h.streams,
-      exit: h.exit,
-    });
-    expect(h.code()).toBe(EXIT_CODES.GENERIC_FAILURE);
-    expect(h.stderr.buf).toContain('NOT_IMPLEMENTED');
-    expect(h.stderr.buf).toContain('schema print');
-    expect(h.stdout.buf).toBe('');
-  });
+  // NOTE: The historical "NOT_IMPLEMENTED stub leaf" tests disappeared when
+  // every P1-era stub was replaced by real handlers in P2 / P3. The
+  // `notImplemented` helper still ships (and is unit-tested in
+  // `notImplemented.test.ts`), but no command wires it up anymore — so there
+  // is no longer a runProgram-level path to reach a generic NOT_IMPLEMENTED
+  // envelope. Pipeline coverage for other error categories (user_input,
+  // commander errors, etc.) is exercised by the tests below.
 
-  it('emits a JSON error envelope when --json is set', async () => {
+  it('schema print with a bad kind emits a USER_INPUT error envelope', async () => {
     const h = harness();
     await runProgram({
-      argv: ['node', 'anaf-cli', '--json', 'schema', 'print', 'UblBuild'],
+      argv: ['node', 'anaf-cli', '--json', 'schema', 'print', 'TotallyBogus'],
       streams: h.streams,
       exit: h.exit,
     });
-    expect(h.code()).toBe(EXIT_CODES.GENERIC_FAILURE);
+    expect(h.code()).toBe(EXIT_CODES.USER_INPUT);
     const parsed = JSON.parse(h.stderr.buf);
-    expect(parsed).toMatchObject({
-      success: false,
-      error: { code: 'NOT_IMPLEMENTED' },
-    });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error.code).toBe('UNKNOWN_MANIFEST_KIND');
   });
 
   it('--version exits 0 and writes the version to stdout', async () => {

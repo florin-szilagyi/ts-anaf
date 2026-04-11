@@ -1,0 +1,17 @@
+apiVersion: anaf-cli/v1
+kind: UblBuild
+context: acme-prod
+spec:
+  invoiceNumber: FCT-100
+  issueDate: 2026-04-11
+  customerCui: RO87654321
+  lines:
+    - "Consultanta IT|10|250|19"
+    - description: "Hardware"
+      quantity: 2
+      unitPrice: 1500
+      taxPercent: 19
+  currency: RON
+  paymentIban: RO49AAAA1B31007593840000
+output:
+  mode: stdout
