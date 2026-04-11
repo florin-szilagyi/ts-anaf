@@ -373,7 +373,7 @@ Update this table as workstreams complete. Keep it short — one line per item.
 | ID | Title | Status | Detailed plan | Notes |
 | --- | --- | --- | --- | --- |
 | P1.1 | Package bootstrap | 🟢 | `2026-04-11-anaf-cli-P1.1.md` | merged in `bdd829d`; D1: esbuild banner removed (0.21 preserves shebang); NITs deferred to P4.1 (regex strictness, `build` script doesn't chain `build:bundle`) |
-| P1.2 | CLI parser scaffold | ⚪ | — | |
+| P1.2 | CLI parser scaffold | 🟢 | `2026-04-11-anaf-cli-P1.2.md` | merged in `f35c02e` + fix `3dbf5d0`; cleared P1.3 NITs (barrel dispatch test, unknown-throw normalization); fix commit suppressed commander auto-error line for clean JSON envelope, classified commander codes by category, wrapped runProgram setup in try + bin last-resort catch |
 | P1.3 | Output layer | 🟢 | `2026-04-11-anaf-cli-P1.3.md` | merged in `c0e3fb5`; FROZEN API verified; NITs deferred to P1.2 (barrel dispatch test, unknown-throw normalization in bin) |
 | P1.4 | State layer | 🟢 | `2026-04-11-anaf-cli-P1.4.md` | merged in `b515b67`; FROZEN API verified; NITs deferred to v1.1 hardening (atomic writes via tmp+rename, `remove()` cascade ordering) |
 | P1.5 | auth commands | ⚪ | — | |
