@@ -135,3 +135,7 @@ token.secret
 # Local test files
 test-*.json
 debug-*.log
+
+# anaf-cli (cli/)
+cli/dist/
+cli/coverage/
