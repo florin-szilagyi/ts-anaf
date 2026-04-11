@@ -32,20 +32,20 @@ describe('runProgram', () => {
   it('exits 1 with NOT_IMPLEMENTED for a stub leaf in text mode', async () => {
     const h = harness();
     await runProgram({
-      argv: ['node', 'anaf-cli', 'auth', 'login'],
+      argv: ['node', 'anaf-cli', 'efactura', 'status'],
       streams: h.streams,
       exit: h.exit,
     });
     expect(h.code()).toBe(EXIT_CODES.GENERIC_FAILURE);
     expect(h.stderr.buf).toContain('NOT_IMPLEMENTED');
-    expect(h.stderr.buf).toContain('auth login');
+    expect(h.stderr.buf).toContain('efactura status');
     expect(h.stdout.buf).toBe('');
   });
 
   it('emits a JSON error envelope when --json is set', async () => {
     const h = harness();
     await runProgram({
-      argv: ['node', 'anaf-cli', '--json', 'auth', 'login'],
+      argv: ['node', 'anaf-cli', '--json', 'efactura', 'status'],
       streams: h.streams,
       exit: h.exit,
     });

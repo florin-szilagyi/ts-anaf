@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { CLI_NAME, CLI_VERSION } from '../version';
 import type { OutputContext } from '../output';
-import type { ContextService } from '../state';
-import type { LookupService } from '../services';
+import type { ContextService, TokenStore } from '../state';
+import type { LookupService, AuthService } from '../services';
 import { attachGlobalFlags } from './flags';
 import { registerAuth } from './groups/auth';
 import { registerCtx } from './groups/ctx';
@@ -31,6 +31,8 @@ import { registerSchema } from './groups/schema';
 export interface ServiceRegistry {
   contextService: ContextService;
   lookupService: LookupService;
+  tokenStore: TokenStore;
+  authService: AuthService;
 }
 
 export interface CommandDeps {

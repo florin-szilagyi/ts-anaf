@@ -1,7 +1,7 @@
 import { CommanderError } from 'commander';
 import { buildProgram, type ServiceRegistry } from './buildProgram';
-import { ContextService } from '../state';
-import { LookupService } from '../services';
+import { ContextService, TokenStore } from '../state';
+import { LookupService, AuthService } from '../services';
 import {
   CliError,
   EXIT_CODES,
@@ -100,9 +100,17 @@ export async function runProgram(options: RunProgramOptions): Promise<void> {
     // Fill every required field from the caller's partial injection, falling
     // back to a default-constructed service. Downstream workstreams append
     // new fields here; they MUST NOT change or reorder existing ones.
+    //
+    // NOTE: `contextService` and `tokenStore` are constructed as locals
+    // BEFORE the literal so that `authService`'s default can reference them
+    // as constructor args. `AuthService` requires both.
+    const contextService = options.services?.contextService ?? new ContextService();
+    const tokenStore = options.services?.tokenStore ?? new TokenStore();
     const services: ServiceRegistry = {
-      contextService: options.services?.contextService ?? new ContextService(),
+      contextService,
       lookupService: options.services?.lookupService ?? new LookupService(),
+      tokenStore,
+      authService: options.services?.authService ?? new AuthService({ contextService, tokenStore }),
     };
 
     const program = buildProgram({
