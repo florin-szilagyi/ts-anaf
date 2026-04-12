@@ -3,7 +3,7 @@
 
 # Source formula for the standalone `anaf-cli` Homebrew tap.
 #
-# This file is published to `florin-szilagyi/homebrew-anaf` as
+# This file is published to `florin-szilagyi/homebrew-anaf-cli` as
 # `Formula/anaf-cli.rb`. The SHA256 placeholders are replaced by the CI
 # release pipeline on every tagged release of the CLI.
 #

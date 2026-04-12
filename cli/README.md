@@ -17,7 +17,7 @@ npx anaf-cli --version
 ### Homebrew
 
 ```bash
-brew tap florin-szilagyi/anaf
+brew tap florin-szilagyi/anaf-cli
 brew install anaf-cli
 ```
 
