@@ -84,6 +84,12 @@ describe('resolveClientSecret', () => {
     expect(resolveClientSecret({ ANAF_CLIENT_SECRET: 'sek' })).toBe('sek');
   });
   it('throws when env var is missing', () => {
-    expect(() => resolveClientSecret({})).toThrow(/CLIENT_SECRET_MISSING/);
+    try {
+      resolveClientSecret({});
+      throw new Error('expected resolveClientSecret to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(McpToolError);
+      expect((err as McpToolError).code).toBe('CLIENT_SECRET_MISSING');
+    }
   });
 });

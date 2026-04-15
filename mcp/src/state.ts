@@ -119,7 +119,7 @@ export function resolveClientSecret(env: NodeJS.ProcessEnv, credentialSecret?: s
   if (credentialSecret && credentialSecret.length > 0) return credentialSecret;
   throw new McpToolError({
     code: 'CLIENT_SECRET_MISSING',
-    message: 'CLIENT_SECRET_MISSING: ANAF OAuth client secret missing. Set ANAF_CLIENT_SECRET in the MCP server env.',
+    message: 'ANAF OAuth client secret missing. Set ANAF_CLIENT_SECRET in the MCP server env.',
     category: 'auth',
   });
 }
