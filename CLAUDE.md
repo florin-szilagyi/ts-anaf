@@ -27,7 +27,7 @@ pnpm run verify                # full CI gate: build SDK → verify CLI (lint+bu
 pnpm run dev -- <args>         # run CLI in dev mode (tsx, no build needed for CLI changes)
 ```
 
-### SDK-specific (`pnpm --filter anaf-ts-sdk run <script>`)
+### SDK-specific (`pnpm --filter @florinszilagyi/anaf-ts-sdk run <script>`)
 
 ```bash
 build          # clean + CJS + ESM + types
@@ -37,7 +37,7 @@ test:ci        # unit tests with coverage
 lint:check     # eslint without fixing
 ```
 
-### CLI-specific (`pnpm --filter anaf-cli run <script>`)
+### CLI-specific (`pnpm --filter @florinszilagyi/anaf-cli run <script>`)
 
 ```bash
 build          # clean + tsc + esbuild bundle (dist/bin/anaf-cli.cjs)
@@ -52,9 +52,9 @@ verify         # lint + build + test (single CI gate)
 ### Running a single test
 
 ```bash
-pnpm --filter anaf-cli exec jest tests/services/lookupService.test.ts
-pnpm --filter anaf-cli exec jest tests/commands/groups/ctx.test.ts -t "ctxLs"
-pnpm --filter anaf-ts-sdk exec jest tests/ublBuilder.unit.test.ts
+pnpm --filter @florinszilagyi/anaf-cli exec jest tests/services/lookupService.test.ts
+pnpm --filter @florinszilagyi/anaf-cli exec jest tests/commands/groups/ctx.test.ts -t "ctxLs"
+pnpm --filter @florinszilagyi/anaf-ts-sdk exec jest tests/ublBuilder.unit.test.ts
 ```
 
 ## Architecture

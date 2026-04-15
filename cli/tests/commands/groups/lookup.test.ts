@@ -5,7 +5,7 @@ import { LookupService } from '../../../src/services';
 import { CliError } from '../../../src/output/errors';
 import { makeOutputContext } from '../../../src/output';
 import { lookupCompany, lookupCompanyAsync, lookupValidateCui } from '../../../src/commands/groups/lookup';
-import type { AnafCompanyData } from 'anaf-ts-sdk';
+import type { AnafCompanyData } from '@florinszilagyi/anaf-ts-sdk';
 
 describe('lookup group', () => {
   it('registers company, company-async, validate-cui', () => {

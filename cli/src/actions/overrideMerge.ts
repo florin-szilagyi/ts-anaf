@@ -1,4 +1,4 @@
-import type { Party } from 'anaf-ts-sdk';
+import type { Party } from '@florinszilagyi/anaf-ts-sdk';
 import type { PartyOverride } from './types';
 
 export function mergePartyOverride(base: Party, override?: PartyOverride): Party {

@@ -40,12 +40,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build SDK
-        run: pnpm --filter anaf-ts-sdk run build
+        run: pnpm --filter @florinszilagyi/anaf-ts-sdk run build
 
       - name: Test SDK
-        run: pnpm --filter anaf-ts-sdk run validate
+        run: pnpm --filter @florinszilagyi/anaf-ts-sdk run validate
 
       - name: Publish SDK
-        run: pnpm --filter anaf-ts-sdk publish --access public --no-git-checks
+        run: pnpm --filter @florinszilagyi/anaf-ts-sdk publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

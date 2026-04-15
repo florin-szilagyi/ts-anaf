@@ -1,5 +1,5 @@
 import { mergePartyOverride } from '../../src/actions/overrideMerge';
-import type { Party } from 'anaf-ts-sdk';
+import type { Party } from '@florinszilagyi/anaf-ts-sdk';
 
 const basePartyFn = (): Party => ({
   registrationName: 'Acme SRL',

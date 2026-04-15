@@ -10,7 +10,7 @@ import {
   type UploadOptions,
   type UploadResponse,
   type ValidationResult,
-} from 'anaf-ts-sdk';
+} from '@florinszilagyi/anaf-ts-sdk';
 import { CliError } from '../output/errors';
 import type { CompanyService, CredentialService, ConfigStore, TokenStore, Environment } from '../state';
 import type { LookupService } from './lookupService';

@@ -4,15 +4,15 @@
   "description": "Monorepo for anaf-ts-sdk (SDK) and anaf-cli (CLI)",
   "scripts": {
     "build": "pnpm -r run build",
-    "build:sdk": "pnpm --filter anaf-ts-sdk run build",
-    "build:cli": "pnpm --filter anaf-ts-sdk run build && pnpm --filter anaf-cli run build",
+    "build:sdk": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build",
+    "build:cli": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build && pnpm --filter @florinszilagyi/anaf-cli run build",
     "test": "pnpm -r run test",
-    "test:sdk": "pnpm --filter anaf-ts-sdk run test:unit",
-    "test:cli": "pnpm --filter anaf-cli run test",
+    "test:sdk": "pnpm --filter @florinszilagyi/anaf-ts-sdk run test:unit",
+    "test:cli": "pnpm --filter @florinszilagyi/anaf-cli run test",
     "lint": "pnpm -r run lint",
     "lint:fix": "pnpm -r run lint:fix",
-    "verify": "pnpm --filter anaf-ts-sdk run build && pnpm --filter anaf-cli run verify",
-    "dev": "pnpm --filter anaf-ts-sdk run build && pnpm --filter anaf-cli run dev"
+    "verify": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build && pnpm --filter @florinszilagyi/anaf-cli run verify",
+    "dev": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build && pnpm --filter @florinszilagyi/anaf-cli run dev"
   },
   "engines": {
     "node": ">=20"

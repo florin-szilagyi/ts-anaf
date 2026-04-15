@@ -1,6 +1,6 @@
 {
-  "name": "anaf-cli",
-  "version": "0.1.0-preview.1",
+  "name": "@florinszilagyi/anaf-cli",
+  "version": "1.0.0",
   "description": "CLI for the ANAF e-Factura SDK (anaf-ts-sdk)",
   "license": "MIT",
   "author": {
@@ -52,7 +52,7 @@
   "devDependencies": {
     "@types/jest": "^29.5.11",
     "@types/node": "^20.10.5",
-    "anaf-ts-sdk": "workspace:*",
+    "@florinszilagyi/anaf-ts-sdk": "workspace:*",
     "esbuild": "^0.21.5",
     "jest": "^29.7.0",
     "rimraf": "^6.0.1",
