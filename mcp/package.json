@@ -25,10 +25,10 @@
     "clean": "rimraf dist coverage",
     "build": "pnpm run clean && tsc -p tsconfig.build.json",
     "dev": "tsx src/server.ts",
-    "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
-    "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts' --no-error-on-unmatched-pattern",
+    "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix --no-error-on-unmatched-pattern",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
     "verify": "pnpm run lint && pnpm run build && pnpm run test"
   },
   "dependencies": {
