@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { readCliState, resolveClientSecret } from '../src/state.js';
+import { readCliState, resolveClientSecret, writeRotatedRefreshToken } from '../src/state.js';
 import { McpToolError } from '../src/errors.js';
 
 function mkTempXdg(): { configHome: string; dataHome: string; cleanup: () => void } {
@@ -58,6 +58,22 @@ describe('readCliState', () => {
     }
   });
 
+  it('throws CONFIG_CORRUPT when credential YAML is malformed', () => {
+    const xdg = mkTempXdg();
+    try {
+      fs.writeFileSync(path.join(xdg.configHome, 'anaf-cli', 'credential.yaml'), 'clientId: "x\n  bad: [unterminated');
+      try {
+        readCliState({ configHome: xdg.configHome, dataHome: xdg.dataHome });
+        throw new Error('expected throw');
+      } catch (err) {
+        expect(err).toBeInstanceOf(McpToolError);
+        expect((err as McpToolError).code).toBe('CONFIG_CORRUPT');
+      }
+    } finally {
+      xdg.cleanup();
+    }
+  });
+
   it('throws NO_ACTIVE_COMPANY when config has no activeCui', () => {
     const xdg = mkTempXdg();
     try {
@@ -83,13 +99,51 @@ describe('resolveClientSecret', () => {
   it('returns env var value when set', () => {
     expect(resolveClientSecret({ ANAF_CLIENT_SECRET: 'sek' })).toBe('sek');
   });
-  it('throws when env var is missing', () => {
+  it('falls back to credentialSecret when env var is empty', () => {
+    expect(resolveClientSecret({}, 'from-file')).toBe('from-file');
+    expect(resolveClientSecret({ ANAF_CLIENT_SECRET: '' }, 'from-file')).toBe('from-file');
+  });
+  it('throws when both env var and credentialSecret are missing', () => {
     try {
       resolveClientSecret({});
       throw new Error('expected resolveClientSecret to throw');
     } catch (err) {
       expect(err).toBeInstanceOf(McpToolError);
       expect((err as McpToolError).code).toBe('CLIENT_SECRET_MISSING');
+    }
+  });
+});
+
+describe('writeRotatedRefreshToken', () => {
+  it('rewrites the token file with mode 0600 even if it previously had 0644', () => {
+    if (process.platform === 'win32') {
+      return; // POSIX-only invariant
+    }
+    const xdg = mkTempXdg();
+    try {
+      const tokenFile = path.join(xdg.dataHome, 'anaf-cli', 'tokens', '_default.json');
+      fs.writeFileSync(
+        tokenFile,
+        JSON.stringify({ refreshToken: 'old', accessToken: 'a1', expiresAt: 'e1', obtainedAt: 'o1' })
+      );
+      fs.chmodSync(tokenFile, 0o644);
+
+      const paths = {
+        configFile: path.join(xdg.configHome, 'anaf-cli', 'config.yaml'),
+        credentialFile: path.join(xdg.configHome, 'anaf-cli', 'credential.yaml'),
+        tokenFile,
+      };
+      writeRotatedRefreshToken(paths, 'new');
+
+      const stat = fs.statSync(tokenFile);
+      expect((stat.mode & 0o777).toString(8)).toBe('600');
+
+      const parsed = JSON.parse(fs.readFileSync(tokenFile, 'utf8'));
+      expect(parsed.refreshToken).toBe('new');
+      expect(parsed.accessToken).toBe('a1');
+      expect(parsed.expiresAt).toBe('e1');
+    } finally {
+      xdg.cleanup();
     }
   });
 });

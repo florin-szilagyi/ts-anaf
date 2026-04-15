@@ -21,9 +21,17 @@ export class McpToolError extends Error {
   }
 }
 
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '[unserializable]';
+  }
+}
+
 export function formatToolError(err: unknown): string {
   if (err instanceof McpToolError) {
-    const detailStr = err.details ? ` (${JSON.stringify(err.details)})` : '';
+    const detailStr = err.details ? ` (${safeStringify(err.details)})` : '';
     return `[${err.code}] ${err.message}${detailStr}`;
   }
   if (err instanceof Error) return err.message;
