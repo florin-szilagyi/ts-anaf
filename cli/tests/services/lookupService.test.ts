@@ -4,7 +4,7 @@ import path from 'node:path';
 import { LookupService } from '../../src/services/lookupService';
 import { getXdgPaths } from '../../src/state/paths';
 import { CliError } from '../../src/output/errors';
-import type { AnafCompanyData, AnafCompanyResult, AnafAsyncCompanyResult } from 'anaf-ts-sdk';
+import type { AnafCompanyData, AnafCompanyResult, AnafAsyncCompanyResult } from '@florinszilagyi/anaf-ts-sdk';
 
 function freshPaths() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-cli-lookup-'));

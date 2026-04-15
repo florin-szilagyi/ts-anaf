@@ -1,5 +1,5 @@
-import { UblBuilder } from 'anaf-ts-sdk';
-import type { AnafCompanyData, InvoiceInput, InvoiceLine, Party } from 'anaf-ts-sdk';
+import { UblBuilder } from '@florinszilagyi/anaf-ts-sdk';
+import type { AnafCompanyData, InvoiceInput, InvoiceLine, Party } from '@florinszilagyi/anaf-ts-sdk';
 import { CliError } from '../output/errors';
 import type { UblBuildAction, InvoiceLineAction, PartyOverride } from '../actions';
 import { mergePartyOverride } from '../actions/overrideMerge';

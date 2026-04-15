@@ -18,7 +18,7 @@ import type {
   ListMessagesResponse,
   PaginatedListMessagesResponse,
   ValidationResult,
-} from 'anaf-ts-sdk';
+} from '@florinszilagyi/anaf-ts-sdk';
 
 class FakeTokenManager {
   public refreshToken: string;

@@ -6,7 +6,7 @@ import { CompanyService, ConfigStore } from '../../src/state';
 import { getXdgPaths } from '../../src/state/paths';
 import { CliError } from '../../src/output/errors';
 import { normalizeUblBuildAction } from '../../src/actions/ublBuildAction';
-import type { AnafCompanyData } from 'anaf-ts-sdk';
+import type { AnafCompanyData } from '@florinszilagyi/anaf-ts-sdk';
 
 function freshPaths() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-cli-ubl-'));

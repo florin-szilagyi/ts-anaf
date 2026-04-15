@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import type { Command } from 'commander';
-import type { MessageFilter } from 'anaf-ts-sdk';
+import type { MessageFilter } from '@florinszilagyi/anaf-ts-sdk';
 import type { CommandDeps } from '../buildProgram';
 import { CliError } from '../../output/errors';
 import { renderSuccess, writeBinary } from '../../output';

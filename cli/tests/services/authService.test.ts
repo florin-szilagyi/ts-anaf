@@ -6,7 +6,7 @@ import { CompanyService, CredentialService, ConfigStore, TokenStore } from '../.
 import { getXdgPaths } from '../../src/state/paths';
 import { CliError } from '../../src/output/errors';
 import type { Credential } from '../../src/state';
-import type { AnafAuthenticator, TokenResponse } from 'anaf-ts-sdk';
+import type { AnafAuthenticator, TokenResponse } from '@florinszilagyi/anaf-ts-sdk';
 
 class FakeAuthenticator {
   authUrl = 'https://logincert.anaf.ro/oauth/authorize?fake=1';

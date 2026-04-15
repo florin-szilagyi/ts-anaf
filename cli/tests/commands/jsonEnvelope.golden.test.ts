@@ -7,7 +7,7 @@ import { CompanyService, CredentialService, ConfigStore, TokenStore } from '../.
 import { AuthService, LookupService, EfacturaService, UblService } from '../../src/services';
 import { getXdgPaths } from '../../src/state/paths';
 import { EXIT_CODES } from '../../src/output/exitCodes';
-import { AnafDetailsClient } from 'anaf-ts-sdk';
+import { AnafDetailsClient } from '@florinszilagyi/anaf-ts-sdk';
 
 class Cap extends Writable {
   buf = '';

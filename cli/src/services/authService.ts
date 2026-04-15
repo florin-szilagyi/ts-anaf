@@ -1,4 +1,4 @@
-import { AnafAuthenticator } from 'anaf-ts-sdk';
+import { AnafAuthenticator } from '@florinszilagyi/anaf-ts-sdk';
 import { CliError } from '../output/errors';
 import type { Credential, CredentialService, CompanyService, ConfigStore, TokenRecord, TokenStore, Company, Environment } from '../state';
 

@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { AnafDetailsClient, type AnafCompanyData, type AnafAsyncPollingConfig } from 'anaf-ts-sdk';
+import { AnafDetailsClient, type AnafCompanyData, type AnafAsyncPollingConfig } from '@florinszilagyi/anaf-ts-sdk';
 import { CliError } from '../output/errors';
 import { defaultXdgPaths, getXdgPaths, type XdgPaths } from '../state/paths';
 

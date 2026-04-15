@@ -53,11 +53,11 @@ jobs:
       - name: Install (workspace)
         run: pnpm install --frozen-lockfile
       - name: Build SDK
-        run: pnpm --filter anaf-ts-sdk run build
+        run: pnpm --filter @florinszilagyi/anaf-ts-sdk run build
       - name: Verify CLI
-        run: pnpm --filter anaf-cli run verify
+        run: pnpm --filter @florinszilagyi/anaf-cli run verify
       - name: Check COMMANDS.md is up to date
-        run: pnpm --filter anaf-cli run gen-docs:check
+        run: pnpm --filter @florinszilagyi/anaf-cli run gen-docs:check
       - name: Read CLI version
         id: read_version
         run: |
@@ -109,9 +109,9 @@ jobs:
       - name: Install (workspace)
         run: pnpm install --frozen-lockfile
       - name: Build SDK
-        run: pnpm --filter anaf-ts-sdk run build
+        run: pnpm --filter @florinszilagyi/anaf-ts-sdk run build
       - name: Build CLI bundle
-        run: pnpm --filter anaf-cli run build
+        run: pnpm --filter @florinszilagyi/anaf-cli run build
       - name: Build SEA binary
         run: |
           mkdir -p "cli/dist/sea/${TARGET}"
@@ -180,8 +180,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build CLI
         run: |
-          pnpm --filter anaf-ts-sdk run build
-          pnpm --filter anaf-cli run build
+          pnpm --filter @florinszilagyi/anaf-ts-sdk run build
+          pnpm --filter @florinszilagyi/anaf-cli run build
       - name: Publish to npm (dry-run default)
         run: |
           cd cli
