@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { McpToolError } from './errors.js';
 
 export type Environment = 'test' | 'prod';
@@ -200,6 +200,66 @@ export function writeRotatedRefreshToken(paths: ResolvedPaths, newToken: string)
   // (fs.writeFileSync({ mode }) only applies mode on create, not on overwrite).
   const tmpPath = `${paths.tokenFile}.${process.pid}.tmp`;
   fs.writeFileSync(tmpPath, JSON.stringify(merged, null, 2), { mode: 0o600 });
+  if (process.platform !== 'win32') {
+    fs.chmodSync(tmpPath, 0o600);
+  }
+  fs.renameSync(tmpPath, paths.tokenFile);
+}
+
+// ── Credential env-var override ──────────────────────────────────────────────
+
+export interface CredentialOverride {
+  clientId?: string;
+  redirectUri?: string;
+}
+
+export function resolveCredentialFromEnv(env: {
+  ANAF_CLIENT_ID?: string;
+  ANAF_REDIRECT_URI?: string;
+}): CredentialOverride {
+  return {
+    clientId: env.ANAF_CLIENT_ID || undefined,
+    redirectUri: env.ANAF_REDIRECT_URI || undefined,
+  };
+}
+
+// ── tlsDir helper ─────────────────────────────────────────────────────────────
+
+export function resolveTlsDir(roots?: CliStateRoots): string {
+  const home = os.homedir();
+  const dataHome = roots?.dataHome ?? process.env.XDG_DATA_HOME ?? path.join(home, '.local', 'share');
+  return path.join(dataHome, APP_DIR, 'tls');
+}
+
+// ── Config write helpers ──────────────────────────────────────────────────────
+
+export function writeActiveCui(paths: ResolvedPaths, cui: string): void {
+  const existing = readYamlObject(paths.configFile) ?? {};
+  const updated = { ...existing, activeCui: cui };
+  fs.mkdirSync(path.dirname(paths.configFile), { recursive: true });
+  fs.writeFileSync(paths.configFile, stringifyYaml(updated), 'utf8');
+}
+
+// ── Full token write (after initial OAuth code exchange) ──────────────────────
+
+export interface OAuthTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}
+
+export function writeFullToken(paths: ResolvedPaths, tokenResponse: OAuthTokenResponse): void {
+  const obtainedAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString();
+  const record: CliTokenRecord = {
+    refreshToken: tokenResponse.refresh_token,
+    accessToken: tokenResponse.access_token,
+    expiresAt,
+    obtainedAt,
+  };
+  fs.mkdirSync(path.dirname(paths.tokenFile), { recursive: true });
+  const tmpPath = `${paths.tokenFile}.${process.pid}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(record, null, 2), { mode: 0o600 });
   if (process.platform !== 'win32') {
     fs.chmodSync(tmpPath, 0o600);
   }
