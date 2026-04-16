@@ -121,7 +121,7 @@ describe('cliConfigSchema', () => {
   it('strips unknown keys (forward-compat with old config.yaml)', () => {
     const parsed = cliConfigSchema.parse({
       activeCui: '12345678',
-      currentContext: 'acme-prod',  // old key — silently dropped
+      currentContext: 'acme-prod', // old key — silently dropped
     });
     expect(parsed).toEqual({ activeCui: '12345678' });
     expect((parsed as Record<string, unknown>).currentContext).toBeUndefined();

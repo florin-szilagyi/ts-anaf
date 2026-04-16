@@ -135,10 +135,14 @@ const PROACTIVE_REFRESH_MS = 24 * 60 * 60 * 1000; // 1 day
 class CachedTokenManager implements TokenManagerLike {
   constructor(
     private readonly _accessToken: string,
-    private readonly _refreshToken: string,
+    private readonly _refreshToken: string
   ) {}
-  async getValidAccessToken(): Promise<string> { return this._accessToken; }
-  getRefreshToken(): string { return this._refreshToken; }
+  async getValidAccessToken(): Promise<string> {
+    return this._accessToken;
+  }
+  getRefreshToken(): string {
+    return this._refreshToken;
+  }
 }
 
 /**
@@ -241,7 +245,7 @@ export class EfacturaService {
   }
 
   private async enrichMessages<T extends ListMessagesResponse | PaginatedListMessagesResponse>(
-    response: T,
+    response: T
   ): Promise<T> {
     if (!this.lookupService || !response.mesaje || response.mesaje.length === 0) {
       return response;
@@ -332,10 +336,7 @@ export class EfacturaService {
     return this.configStore.getEnv();
   }
 
-  private async withClient<T>(
-    clientSecret: string,
-    fn: (client: EfacturaClientLike) => Promise<T>,
-  ): Promise<T> {
+  private async withClient<T>(clientSecret: string, fn: (client: EfacturaClientLike) => Promise<T>): Promise<T> {
     const { cui, env } = this.resolveActiveCompany();
     const credential = this.credentialService.get();
     const authenticator = this.buildAuthenticator(credential.clientId, clientSecret, credential.redirectUri);
@@ -354,10 +355,7 @@ export class EfacturaService {
     }
   }
 
-  private async withTools<T>(
-    clientSecret: string,
-    fn: (tools: EfacturaToolsClientLike) => Promise<T>,
-  ): Promise<T> {
+  private async withTools<T>(clientSecret: string, fn: (tools: EfacturaToolsClientLike) => Promise<T>): Promise<T> {
     const env = this.resolveEnv();
     const credential = this.credentialService.get();
     const authenticator = this.buildAuthenticator(credential.clientId, clientSecret, credential.redirectUri);
@@ -394,11 +392,7 @@ export class EfacturaService {
     }
     const { refreshToken } = record;
 
-    if (
-      record.accessToken &&
-      record.expiresAt &&
-      Date.now() < Date.parse(record.expiresAt) - PROACTIVE_REFRESH_MS
-    ) {
+    if (record.accessToken && record.expiresAt && Date.now() < Date.parse(record.expiresAt) - PROACTIVE_REFRESH_MS) {
       return {
         tokenManager: new CachedTokenManager(record.accessToken, refreshToken),
         originalRefreshToken: refreshToken,

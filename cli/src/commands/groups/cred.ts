@@ -33,11 +33,7 @@ export async function credSet(deps: CommandDeps, opts: CredSetOptions): Promise<
     }
     deps.services.configStore.setEnv(env as Environment);
     if (!hasCredFields) {
-      renderSuccess(
-        deps.output,
-        { env },
-        (d) => `environment set to: ${d.env}`,
-      );
+      renderSuccess(deps.output, { env }, (d) => `environment set to: ${d.env}`);
       return;
     }
   }
@@ -63,11 +59,7 @@ export async function credSet(deps: CommandDeps, opts: CredSetOptions): Promise<
     redirectUri: cred.redirectUri,
     ...(hasEnv ? { env: opts.env as string } : {}),
   };
-  renderSuccess(
-    deps.output,
-    data,
-    (d) => `credential saved (clientId: ${d.clientId})`,
-  );
+  renderSuccess(deps.output, data, (d) => `credential saved (clientId: ${d.clientId})`);
 }
 
 export async function credShow(deps: CommandDeps): Promise<void> {

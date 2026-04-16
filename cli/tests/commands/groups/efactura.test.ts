@@ -349,11 +349,18 @@ describe('efacturaMessages', () => {
   it('includes beneficiarName in table output', async () => {
     const h = harness();
     h.efacturaService.messagesResult = {
-      mesaje: [{
-        id: '1', tip: 'FACTURA TRIMISA', data_creare: '202604131822', detalii: '',
-        cif_emitent: '111', emitentName: 'Acme SRL',
-        cif_beneficiar: '222', beneficiarName: 'Beta SRL',
-      }],
+      mesaje: [
+        {
+          id: '1',
+          tip: 'FACTURA TRIMISA',
+          data_creare: '202604131822',
+          detalii: '',
+          cif_emitent: '111',
+          emitentName: 'Acme SRL',
+          cif_beneficiar: '222',
+          beneficiarName: 'Beta SRL',
+        },
+      ],
     };
     try {
       await efacturaMessages({ output: h.text, services: h.services }, { days: '7' });

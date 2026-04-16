@@ -241,11 +241,19 @@ export async function efacturaMessages(deps: CommandDeps, opts: MessagesCmdOpts)
     page,
   });
   renderSuccess(deps.output, response, (d) => {
-    const messages = (d as { mesaje?: Array<{
-      id?: string; tip?: string; data_creare?: string;
-      cif_emitent?: string; emitentName?: string;
-      cif_beneficiar?: string; beneficiarName?: string;
-    }> }).mesaje;
+    const messages = (
+      d as {
+        mesaje?: Array<{
+          id?: string;
+          tip?: string;
+          data_creare?: string;
+          cif_emitent?: string;
+          emitentName?: string;
+          cif_beneficiar?: string;
+          beneficiarName?: string;
+        }>;
+      }
+    ).mesaje;
     if (!messages || messages.length === 0) return '(no messages)';
     return table(
       [

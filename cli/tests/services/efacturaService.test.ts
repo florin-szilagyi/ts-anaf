@@ -239,7 +239,14 @@ describe('EfacturaService.upload', () => {
     const h = harness({
       tokenManagerFactory: (args) => {
         factoryCalled = true;
-        return { async getValidAccessToken() { return 'at-from-factory'; }, getRefreshToken() { return args.refreshToken; } };
+        return {
+          async getValidAccessToken() {
+            return 'at-from-factory';
+          },
+          getRefreshToken() {
+            return args.refreshToken;
+          },
+        };
       },
     });
     setupState(h);
@@ -261,7 +268,14 @@ describe('EfacturaService.upload', () => {
     const h = harness({
       tokenManagerFactory: (args) => {
         factoryCalled = true;
-        return { async getValidAccessToken() { return 'at-fresh'; }, getRefreshToken() { return args.refreshToken; } };
+        return {
+          async getValidAccessToken() {
+            return 'at-fresh';
+          },
+          getRefreshToken() {
+            return args.refreshToken;
+          },
+        };
       },
     });
     setupState(h);
@@ -606,16 +620,17 @@ describe('EfacturaService message enrichment', () => {
     const fakeClient = new FakeEfacturaClient();
 
     const fakeLookup = {
-      batchGetCompanies: jest.fn(async (cuis: readonly string[]): Promise<AnafCompanyData[]> =>
-        cuis.map((cui) => ({
-          vatCode: cui,
-          name: `Company-${cui}`,
-          registrationNumber: '',
-          address: '',
-          postalCode: null,
-          contactPhone: '',
-          scpTva: false,
-        }))
+      batchGetCompanies: jest.fn(
+        async (cuis: readonly string[]): Promise<AnafCompanyData[]> =>
+          cuis.map((cui) => ({
+            vatCode: cui,
+            name: `Company-${cui}`,
+            registrationNumber: '',
+            address: '',
+            postalCode: null,
+            contactPhone: '',
+            scpTva: false,
+          }))
       ),
     } as unknown as LookupService;
 
@@ -649,8 +664,14 @@ describe('EfacturaService message enrichment', () => {
     const { service, fakeClient, fakeLookup } = enrichHarness();
     fakeClient.getMessages.mockResolvedValueOnce({
       mesaje: [
-        { id: '1', tip: 'FACTURA TRIMISA', data_creare: '202604131822', detalii: '',
-          cif_emitent: '111', cif_beneficiar: '222' },
+        {
+          id: '1',
+          tip: 'FACTURA TRIMISA',
+          data_creare: '202604131822',
+          detalii: '',
+          cif_emitent: '111',
+          cif_beneficiar: '222',
+        },
       ],
     } as unknown as ListMessagesResponse);
 
@@ -666,10 +687,22 @@ describe('EfacturaService message enrichment', () => {
     const { service, fakeClient, fakeLookup } = enrichHarness();
     fakeClient.getMessages.mockResolvedValueOnce({
       mesaje: [
-        { id: '1', tip: 'FACTURA TRIMISA', data_creare: '202604131822', detalii: '',
-          cif_emitent: '111', cif_beneficiar: '222' },
-        { id: '2', tip: 'FACTURA PRIMITA', data_creare: '202604131822', detalii: '',
-          cif_emitent: '222', cif_beneficiar: '111' },
+        {
+          id: '1',
+          tip: 'FACTURA TRIMISA',
+          data_creare: '202604131822',
+          detalii: '',
+          cif_emitent: '111',
+          cif_beneficiar: '222',
+        },
+        {
+          id: '2',
+          tip: 'FACTURA PRIMITA',
+          data_creare: '202604131822',
+          detalii: '',
+          cif_emitent: '222',
+          cif_beneficiar: '111',
+        },
       ],
     } as unknown as ListMessagesResponse);
 
@@ -683,8 +716,14 @@ describe('EfacturaService message enrichment', () => {
     (fakeLookup.batchGetCompanies as jest.Mock).mockRejectedValueOnce(new Error('network'));
     fakeClient.getMessages.mockResolvedValueOnce({
       mesaje: [
-        { id: '1', tip: 'FACTURA TRIMISA', data_creare: '202604131822', detalii: '',
-          cif_emitent: '111', cif_beneficiar: '222' },
+        {
+          id: '1',
+          tip: 'FACTURA TRIMISA',
+          data_creare: '202604131822',
+          detalii: '',
+          cif_emitent: '111',
+          cif_beneficiar: '222',
+        },
       ],
     } as unknown as ListMessagesResponse);
 

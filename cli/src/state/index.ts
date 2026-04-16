@@ -1,11 +1,4 @@
-export type {
-  Environment,
-  Credential,
-  Company,
-  CliConfig,
-  CliConfigDefaults,
-  TokenRecord,
-} from './types';
+export type { Environment, Credential, Company, CliConfig, CliConfigDefaults, TokenRecord } from './types';
 
 export type { XdgPaths, XdgRoots } from './paths';
 export { defaultXdgPaths, getXdgPaths } from './paths';

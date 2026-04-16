@@ -5,8 +5,6 @@ export default {
   testMatch: ['**/tests/**/*.test.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
-    '^@florinszilagyi/anaf-ts-sdk$':
-      '<rootDir>/../sdk/dist/index.js',
   },
   extensionsToTreatAsEsm: ['.ts'],
   transform: {

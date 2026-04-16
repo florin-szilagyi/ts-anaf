@@ -3,7 +3,15 @@ import { buildProgram } from '../../../src/commands/buildProgram';
 import { AuthService } from '../../../src/services';
 import { CliError } from '../../../src/output/errors';
 import { makeOutputContext } from '../../../src/output';
-import { authUse, authWhoami, authLogout, authRefresh, authLs, authRm, authToken } from '../../../src/commands/groups/auth';
+import {
+  authUse,
+  authWhoami,
+  authLogout,
+  authRefresh,
+  authLs,
+  authRm,
+  authToken,
+} from '../../../src/commands/groups/auth';
 import type { Credential, TokenRecord, Company } from '../../../src/state';
 import { getXdgPaths } from '../../../src/state';
 
@@ -154,11 +162,21 @@ const sampleTokenRecord = (): TokenRecord => ({
 
 const stubTokenStore = {
   _record: sampleTokenRecord() as TokenRecord | undefined,
-  read(_name: string) { return this._record; },
-  write(_name: string, record: TokenRecord) { this._record = record; },
-  remove(_name: string) { this._record = undefined; },
-  exists(_name: string) { return this._record !== undefined; },
-  getRefreshToken(_name: string) { return this._record?.refreshToken; },
+  read(_name: string) {
+    return this._record;
+  },
+  write(_name: string, record: TokenRecord) {
+    this._record = record;
+  },
+  remove(_name: string) {
+    this._record = undefined;
+  },
+  exists(_name: string) {
+    return this._record !== undefined;
+  },
+  getRefreshToken(_name: string) {
+    return this._record?.refreshToken;
+  },
   setRefreshToken(_name: string, _rt: string) {},
 };
 
@@ -201,9 +219,16 @@ describe('auth group', () => {
       paths: getXdgPaths(),
     });
     const auth = program.commands.find((c) => c.name() === 'auth')!;
-    expect(auth.commands.map((c) => c.name()).sort()).toEqual(
-      ['login', 'logout', 'ls', 'refresh', 'rm', 'token', 'use', 'whoami']
-    );
+    expect(auth.commands.map((c) => c.name()).sort()).toEqual([
+      'login',
+      'logout',
+      'ls',
+      'refresh',
+      'rm',
+      'token',
+      'use',
+      'whoami',
+    ]);
   });
 
   it('--help renders all subcommands', () => {
@@ -217,10 +242,7 @@ describe('auth group', () => {
 describe('authUse', () => {
   it('sets the active CUI and prints success', async () => {
     const h = harness();
-    await authUse(
-      { output: h.text, services: h.services as never, paths: getXdgPaths() },
-      '12345678',
-    );
+    await authUse({ output: h.text, services: h.services as never, paths: getXdgPaths() }, '12345678');
     expect(h.configStore.activeCui).toBe('12345678');
     expect(h.stdout.buf).toContain('Acme SRL');
   });
@@ -264,10 +286,7 @@ describe('authLs', () => {
 describe('authRm', () => {
   it('removes a company and clears active if it was active', async () => {
     const h = harness();
-    await authRm(
-      { output: h.text, services: h.services as never, paths: getXdgPaths() },
-      '12345678',
-    );
+    await authRm({ output: h.text, services: h.services as never, paths: getXdgPaths() }, '12345678');
     expect(h.companyService.removedCuis).toEqual(['12345678']);
     expect(h.configStore.activeCui).toBeUndefined();
   });
@@ -284,10 +303,7 @@ describe('authLogout', () => {
 describe('authRefresh', () => {
   it('refreshes and prints success', async () => {
     const h = harness();
-    await authRefresh(
-      { output: h.text, services: h.services as never, paths: getXdgPaths() },
-      {},
-    );
+    await authRefresh({ output: h.text, services: h.services as never, paths: getXdgPaths() }, {});
     expect(h.stdout.buf).toContain('refreshed');
   });
 });

@@ -249,12 +249,13 @@ export async function authToken(deps: CommandDeps, opts: RefreshOpts): Promise<v
       expiresAt: record.expiresAt,
       obtainedAt: record.obtainedAt,
     },
-    (d) => [
-      `accessToken:  ${d.accessToken ?? '(none — run auth refresh)'}`,
-      `refreshToken: ${d.refreshToken}`,
-      `expiresAt:    ${d.expiresAt ?? '?'}`,
-      `obtainedAt:   ${d.obtainedAt ?? '?'}`,
-    ].join('\n'),
+    (d) =>
+      [
+        `accessToken:  ${d.accessToken ?? '(none — run auth refresh)'}`,
+        `refreshToken: ${d.refreshToken}`,
+        `expiresAt:    ${d.expiresAt ?? '?'}`,
+        `obtainedAt:   ${d.obtainedAt ?? '?'}`,
+      ].join('\n')
   );
 }
 

@@ -288,7 +288,10 @@ describe('ublBuild', () => {
       const inputPath = path.join(tmp, 'invoice.json');
       fs.writeFileSync(inputPath, '{}');
       await expect(
-        ublBuild({ output: h.text, services: h.services, paths: getXdgPaths() }, { fromJson: inputPath, invoiceNumber: 'FCT-X' })
+        ublBuild(
+          { output: h.text, services: h.services, paths: getXdgPaths() },
+          { fromJson: inputPath, invoiceNumber: 'FCT-X' }
+        )
       ).rejects.toBeInstanceOf(CliError);
     } finally {
       fs.rmSync(tmp, { recursive: true });
@@ -319,7 +322,9 @@ describe('ublBuild', () => {
 
   it('throws BAD_USAGE when required flags are missing', async () => {
     const h = harness();
-    await expect(ublBuild({ output: h.text, services: h.services, paths: getXdgPaths() }, {})).rejects.toBeInstanceOf(CliError);
+    await expect(ublBuild({ output: h.text, services: h.services, paths: getXdgPaths() }, {})).rejects.toBeInstanceOf(
+      CliError
+    );
   });
 });
 
@@ -359,6 +364,8 @@ describe('ublInspect', () => {
 
   it('throws BAD_USAGE when --xml is missing', async () => {
     const h = harness();
-    await expect(ublInspect({ output: h.text, services: h.services, paths: getXdgPaths() }, {})).rejects.toBeInstanceOf(CliError);
+    await expect(ublInspect({ output: h.text, services: h.services, paths: getXdgPaths() }, {})).rejects.toBeInstanceOf(
+      CliError
+    );
   });
 });

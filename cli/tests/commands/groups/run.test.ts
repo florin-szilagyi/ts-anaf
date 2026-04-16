@@ -121,7 +121,11 @@ spec:
 
 describe('run group', () => {
   it('registers run command with --file and --dry-run', () => {
-    const program = buildProgram({ output: makeOutputContext({ format: 'text' }), services: {} as never, paths: getXdgPaths() });
+    const program = buildProgram({
+      output: makeOutputContext({ format: 'text' }),
+      services: {} as never,
+      paths: getXdgPaths(),
+    });
     const run = program.commands.find((c) => c.name() === 'run')!;
     const longs = run.options.map((o) => o.long);
     expect(longs).toEqual(expect.arrayContaining(['--file', '--dry-run']));
@@ -131,7 +135,9 @@ describe('run group', () => {
 describe('runCommand — argument validation', () => {
   it('throws BAD_USAGE when --file is missing', async () => {
     const h = harness();
-    await expect(runCommand({ output: h.text, services: h.services, paths: getXdgPaths() }, {})).rejects.toBeInstanceOf(CliError);
+    await expect(runCommand({ output: h.text, services: h.services, paths: getXdgPaths() }, {})).rejects.toBeInstanceOf(
+      CliError
+    );
   });
 });
 
@@ -178,9 +184,9 @@ spec:
     - "x|1|100|19"
 `);
     try {
-      await expect(runCommand({ output: h.text, services: h.services, paths: getXdgPaths() }, { file, dryRun: true })).rejects.toBeInstanceOf(
-        CliError
-      );
+      await expect(
+        runCommand({ output: h.text, services: h.services, paths: getXdgPaths() }, { file, dryRun: true })
+      ).rejects.toBeInstanceOf(CliError);
     } finally {
       cleanup();
     }

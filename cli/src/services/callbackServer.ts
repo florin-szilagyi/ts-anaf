@@ -52,15 +52,21 @@ export function ensureLocalhostCert(tlsDir: string): { cert: Buffer; key: Buffer
   execFileSync(
     'openssl',
     [
-      'req', '-x509',
-      '-newkey', 'rsa:2048',
-      '-keyout', keyPath,
-      '-out', certPath,
-      '-days', '365',
+      'req',
+      '-x509',
+      '-newkey',
+      'rsa:2048',
+      '-keyout',
+      keyPath,
+      '-out',
+      certPath,
+      '-days',
+      '365',
       '-nodes',
-      '-subj', '/CN=localhost',
+      '-subj',
+      '/CN=localhost',
     ],
-    { stdio: 'pipe' },
+    { stdio: 'pipe' }
   );
 
   return { cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) };

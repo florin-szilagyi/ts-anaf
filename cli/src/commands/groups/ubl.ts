@@ -263,7 +263,10 @@ export function registerUbl(parent: Command, deps: CommandDeps): void {
     .option('--customer-cui <cui>', 'customer CUI')
     .option('--line <line>', 'invoice line: "desc|qty|unitPrice|taxPct[|unitCode]"', collectLine, [] as string[])
     .option('--currency <code>', 'currency code')
-    .option('--tax-currency-tax-amount <amount>', 'total VAT in RON (required when --currency is not RON, CIUS-RO BR-53)')
+    .option(
+      '--tax-currency-tax-amount <amount>',
+      'total VAT in RON (required when --currency is not RON, CIUS-RO BR-53)'
+    )
     .option('--payment-iban <iban>', 'payment IBAN')
     .option('--note <text>', 'free-form note')
     .option('--out <path>', 'output XML file path')

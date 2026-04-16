@@ -1,6 +1,15 @@
 import { AnafAuthenticator } from '@florinszilagyi/anaf-ts-sdk';
 import { CliError } from '../output/errors';
-import type { Credential, CredentialService, CompanyService, ConfigStore, TokenRecord, TokenStore, Company, Environment } from '../state';
+import type {
+  Credential,
+  CredentialService,
+  CompanyService,
+  ConfigStore,
+  TokenRecord,
+  TokenStore,
+  Company,
+  Environment,
+} from '../state';
 
 export interface AuthServiceOptions {
   credentialService: CredentialService;
@@ -83,7 +92,8 @@ export class AuthService {
     }
     throw new CliError({
       code: 'CLIENT_SECRET_MISSING',
-      message: 'OAuth client secret is required. Store it in the credential, set ANAF_CLIENT_SECRET, or pass --client-secret-stdin.',
+      message:
+        'OAuth client secret is required. Store it in the credential, set ANAF_CLIENT_SECRET, or pass --client-secret-stdin.',
       category: 'auth',
     });
   }
