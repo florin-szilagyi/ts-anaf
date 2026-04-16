@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { UblBuilder, InvoiceInput } from '@florinszilagyi/anaf-ts-sdk';
 import { McpToolError, formatToolError } from '../errors.js';
-import type { ToolResult } from './lookup.js';
+import type { ToolResult } from './types.js';
 
 const addressSchema = z.object({
   street: z.string(),
@@ -53,7 +53,7 @@ export interface UblDeps {
 
 export async function handleBuildUbl(input: BuildUblInput, deps: UblDeps): Promise<ToolResult> {
   try {
-    const xml = deps.builder.generateInvoiceXml(input as unknown as InvoiceInput);
+    const xml = deps.builder.generateInvoiceXml(input as InvoiceInput);
     return { content: [{ type: 'text', text: xml }] };
   } catch (err) {
     const wrapped = new McpToolError({

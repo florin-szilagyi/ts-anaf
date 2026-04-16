@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import type { AnafDetailsClient } from '@florinszilagyi/anaf-ts-sdk';
 import { McpToolError, formatToolError } from '../errors.js';
+import type { ToolResult } from './types.js';
+
+export type { ToolResult };
 
 export const lookupCompanyInputSchema = z.object({
   cui: z.string().min(1).describe('Romanian company CUI/CIF (with or without RO prefix)'),
@@ -10,11 +13,6 @@ export type LookupCompanyInput = z.infer<typeof lookupCompanyInputSchema>;
 
 export interface LookupDeps {
   details: Pick<AnafDetailsClient, 'batchGetCompanyData'>;
-}
-
-export interface ToolResult {
-  content: Array<{ type: 'text'; text: string }>;
-  isError?: boolean;
 }
 
 export async function handleLookupCompany(input: LookupCompanyInput, deps: LookupDeps): Promise<ToolResult> {
