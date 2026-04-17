@@ -15,9 +15,14 @@ describe('MCP server smoke test', () => {
     }
   });
 
-  it('lists all 7 tools in response to tools/list', async () => {
+  it('lists all 10 tools in response to tools/list', async () => {
     const child = spawn('node', [SERVER_PATH], {
-      env: { ...process.env, ANAF_CLIENT_SECRET: 'dummy' },
+      env: {
+        ...process.env,
+        ANAF_CLIENT_ID: 'dummy',
+        ANAF_CLIENT_SECRET: 'dummy',
+        ANAF_REDIRECT_URI: 'https://localhost:9002/callback',
+      },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -36,6 +41,9 @@ describe('MCP server smoke test', () => {
       }, 5000);
     });
 
+    expect(output).toContain('anaf_auth_login');
+    expect(output).toContain('anaf_auth_complete');
+    expect(output).toContain('anaf_switch_company');
     expect(output).toContain('anaf_lookup_company');
     expect(output).toContain('anaf_build_ubl');
     expect(output).toContain('anaf_validate_xml');

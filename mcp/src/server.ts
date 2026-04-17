@@ -5,7 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { UblBuilder, AnafDetailsClient } from '@florinszilagyi/anaf-ts-sdk';
 
-import { readCliState, resolveClientSecret } from './state.js';
+import { readCliState, resolveClientSecret, resolveCredentialFromEnv } from './state.js';
 import { buildServices } from './services.js';
 import { McpToolError, formatToolError } from './errors.js';
 
@@ -20,6 +20,17 @@ import {
   downloadInvoiceInputSchema,
 } from './tools/download.js';
 import { LIST_MESSAGES_TOOL_DEFINITION, handleListMessages, listMessagesInputSchema } from './tools/messages.js';
+import {
+  AUTH_LOGIN_TOOL_DEFINITION,
+  AUTH_COMPLETE_TOOL_DEFINITION,
+  SWITCH_COMPANY_TOOL_DEFINITION,
+  handleAuthLogin,
+  handleAuthComplete,
+  handleSwitchCompany,
+  authLoginInputSchema,
+  authCompleteInputSchema,
+  switchCompanyInputSchema,
+} from './tools/auth.js';
 import { zodToJsonSchema } from './jsonSchema.js';
 
 const SERVER_INFO = {
@@ -28,6 +39,9 @@ const SERVER_INFO = {
 };
 
 const TOOL_DEFINITIONS = [
+  AUTH_LOGIN_TOOL_DEFINITION,
+  AUTH_COMPLETE_TOOL_DEFINITION,
+  SWITCH_COMPANY_TOOL_DEFINITION,
   LOOKUP_TOOL_DEFINITION,
   BUILD_UBL_TOOL_DEFINITION,
   VALIDATE_XML_TOOL_DEFINITION,
@@ -40,7 +54,11 @@ const TOOL_DEFINITIONS = [
 type AnyToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
 async function runAuthedTool<T>(fn: (services: ReturnType<typeof buildServices>) => Promise<T>): Promise<T> {
-  const state = readCliState();
+  const credentialOverride = resolveCredentialFromEnv({
+    ANAF_CLIENT_ID: process.env.ANAF_CLIENT_ID,
+    ANAF_REDIRECT_URI: process.env.ANAF_REDIRECT_URI,
+  });
+  const state = readCliState(undefined, credentialOverride);
   const clientSecret = resolveClientSecret(
     { ANAF_CLIENT_SECRET: process.env.ANAF_CLIENT_SECRET },
     state.credential.clientSecret
@@ -56,6 +74,24 @@ async function runAuthedTool<T>(fn: (services: ReturnType<typeof buildServices>)
 export async function handleToolCall(name: string, args: unknown): Promise<AnyToolResult> {
   try {
     switch (name) {
+      case AUTH_LOGIN_TOOL_DEFINITION.name: {
+        const input = authLoginInputSchema.parse(args);
+        return handleAuthLogin(input, {
+          env: {
+            ANAF_CLIENT_ID: process.env.ANAF_CLIENT_ID,
+            ANAF_CLIENT_SECRET: process.env.ANAF_CLIENT_SECRET,
+            ANAF_REDIRECT_URI: process.env.ANAF_REDIRECT_URI,
+          },
+        });
+      }
+      case AUTH_COMPLETE_TOOL_DEFINITION.name: {
+        const input = authCompleteInputSchema.parse(args);
+        return handleAuthComplete(input);
+      }
+      case SWITCH_COMPANY_TOOL_DEFINITION.name: {
+        const input = switchCompanyInputSchema.parse(args);
+        return handleSwitchCompany(input, {});
+      }
       case LOOKUP_TOOL_DEFINITION.name: {
         const input = lookupCompanyInputSchema.parse(args);
         return handleLookupCompany(input, { details: new AnafDetailsClient() });

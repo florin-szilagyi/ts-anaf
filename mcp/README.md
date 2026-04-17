@@ -21,16 +21,19 @@ The MCP server reads:
 
 | File | Purpose |
 |---|---|
-| `~/.config/anaf-cli/credential.yaml` | OAuth client ID + redirect URI |
+| `~/.config/anaf-cli/credential.yaml` | OAuth client ID + redirect URI (optional if env vars set) |
 | `~/.config/anaf-cli/config.yaml` | Active company CUI and environment (test/prod) |
 | `~/.local/share/anaf-cli/tokens/_default.json` | Refresh + access tokens |
 
-The client secret is **not** read from disk — pass it via `ANAF_CLIENT_SECRET` env var.
+All three OAuth values (`ANAF_CLIENT_ID`, `ANAF_CLIENT_SECRET`, `ANAF_REDIRECT_URI`) can be provided as env vars instead of using `credential.yaml`. If all three env vars are set, no CLI setup is required.
 
 ## Tools
 
 | Tool | Auth | Description |
 |---|---|---|
+| `anaf_auth_login` | Setup | Start OAuth flow — returns URL to open in browser |
+| `anaf_auth_complete` | Setup | Finish OAuth — waits for callback, stores token |
+| `anaf_switch_company` | No | Switch active company CUI (no re-auth needed) |
 | `anaf_lookup_company` | No | Public ANAF company registry lookup by CUI |
 | `anaf_build_ubl` | No | Generate CIUS-RO UBL 2.1 invoice XML |
 | `anaf_validate_xml` | Yes | Validate UBL XML against ANAF rules |
@@ -38,6 +41,16 @@ The client secret is **not** read from disk — pass it via `ANAF_CLIENT_SECRET`
 | `anaf_invoice_status` | Yes | Poll upload processing status |
 | `anaf_download_invoice` | Yes | Download the processed ZIP archive |
 | `anaf_list_messages` | Yes | List sent/received/error messages |
+
+## Authentication
+
+Authentication is a two-step flow the agent performs on your behalf:
+
+1. Agent calls `anaf_auth_login({ cui: "12345678" })` → returns the ANAF OAuth URL
+2. You open the URL in your browser and authenticate with your digital certificate
+3. Agent calls `anaf_auth_complete()` → exchanges the code, stores the token
+
+After that, all tools work automatically. To switch companies without re-authenticating, call `anaf_switch_company`.
 
 ## Claude Desktop
 
@@ -50,7 +63,9 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
       "command": "npx",
       "args": ["-y", "@florinszilagyi/anaf-mcp"],
       "env": {
-        "ANAF_CLIENT_SECRET": "your-oauth-client-secret"
+        "ANAF_CLIENT_ID": "your-oauth-client-id",
+        "ANAF_CLIENT_SECRET": "your-oauth-client-secret",
+        "ANAF_REDIRECT_URI": "https://localhost:9002/callback"
       }
     }
   }

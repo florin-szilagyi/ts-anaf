@@ -41,7 +41,7 @@ export interface ResolvedPaths {
 const APP_DIR = 'anaf-cli';
 const TOKEN_KEY = '_default';
 
-function resolvePaths(roots?: CliStateRoots): ResolvedPaths {
+export function resolvePaths(roots?: CliStateRoots): ResolvedPaths {
   const home = os.homedir();
   const configHome = roots?.configHome ?? process.env.XDG_CONFIG_HOME ?? path.join(home, '.config');
   const dataHome = roots?.dataHome ?? process.env.XDG_DATA_HOME ?? path.join(home, '.local', 'share');
@@ -113,19 +113,31 @@ function asOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-export function readCliState(roots?: CliStateRoots): CliState {
+export function readCliState(roots?: CliStateRoots, credentialOverride?: CredentialOverride): CliState {
   const paths = resolvePaths(roots);
 
-  const credentialRaw = readYamlObject(paths.credentialFile);
-  const clientId = asOptionalString(credentialRaw?.clientId);
-  const redirectUri = asOptionalString(credentialRaw?.redirectUri);
-  if (!credentialRaw || !clientId || !redirectUri) {
-    throw new McpToolError({
-      code: 'CONFIG_MISSING',
-      message: 'ANAF CLI credential file not found. Run `anaf-cli cred set` with clientId and redirectUri first.',
-      category: 'config_missing',
-      details: { path: paths.credentialFile },
-    });
+  let credential: CliCredential;
+  if (credentialOverride?.clientId && credentialOverride?.redirectUri) {
+    credential = { clientId: credentialOverride.clientId, redirectUri: credentialOverride.redirectUri };
+  } else {
+    const credentialRaw = readYamlObject(paths.credentialFile);
+    const clientId = credentialOverride?.clientId ?? asOptionalString(credentialRaw?.clientId);
+    const redirectUri = credentialOverride?.redirectUri ?? asOptionalString(credentialRaw?.redirectUri);
+    if (!clientId || !redirectUri) {
+      throw new McpToolError({
+        code: 'CONFIG_MISSING',
+        message:
+          'ANAF credential not configured. Either set ANAF_CLIENT_ID and ANAF_REDIRECT_URI env vars, ' +
+          'or run `anaf-cli cred set` with clientId and redirectUri.',
+        category: 'config_missing',
+        details: { path: paths.credentialFile },
+      });
+    }
+    credential = {
+      clientId,
+      redirectUri,
+      clientSecret: asOptionalString(credentialRaw?.clientSecret),
+    };
   }
 
   const configRaw = readYamlObject(paths.configFile) ?? {};
@@ -133,7 +145,7 @@ export function readCliState(roots?: CliStateRoots): CliState {
   if (!activeCui) {
     throw new McpToolError({
       code: 'NO_ACTIVE_COMPANY',
-      message: 'No active company set. Run `anaf-cli auth login <CUI>` or `anaf-cli auth use <CUI>` first.',
+      message: 'No active company set. Call anaf_auth_login or anaf_switch_company first.',
       category: 'config_missing',
       details: { path: paths.configFile },
     });
@@ -144,7 +156,7 @@ export function readCliState(roots?: CliStateRoots): CliState {
   if (!refreshToken) {
     throw new McpToolError({
       code: 'NO_REFRESH_TOKEN',
-      message: 'No refresh token persisted. Run `anaf-cli auth login <CUI>` first.',
+      message: 'No refresh token found. Call anaf_auth_login and anaf_auth_complete first.',
       category: 'auth',
       details: { path: paths.tokenFile },
     });
@@ -155,11 +167,7 @@ export function readCliState(roots?: CliStateRoots): CliState {
   return {
     activeCui,
     env,
-    credential: {
-      clientId,
-      clientSecret: asOptionalString(credentialRaw.clientSecret),
-      redirectUri,
-    },
+    credential,
     token: {
       refreshToken,
       accessToken: asOptionalString(tokenRaw?.accessToken),
@@ -229,6 +237,12 @@ export function resolveTlsDir(roots?: CliStateRoots): string {
   const home = os.homedir();
   const dataHome = roots?.dataHome ?? process.env.XDG_DATA_HOME ?? path.join(home, '.local', 'share');
   return path.join(dataHome, APP_DIR, 'tls');
+}
+
+export function resolveCompaniesDir(roots?: CliStateRoots): string {
+  const home = os.homedir();
+  const configHome = roots?.configHome ?? process.env.XDG_CONFIG_HOME ?? path.join(home, '.config');
+  return path.join(configHome, APP_DIR, 'companies');
 }
 
 // ── Config write helpers ──────────────────────────────────────────────────────
