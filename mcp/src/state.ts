@@ -162,7 +162,8 @@ export function readCliState(roots?: CliStateRoots, credentialOverride?: Credent
     });
   }
 
-  const env = asOptionalString(configRaw.env) === 'prod' ? 'prod' : 'test';
+  const envStr = process.env.ANAF_ENV ?? asOptionalString(configRaw.env) ?? 'prod';
+  const env: Environment = envStr === 'test' ? 'test' : 'prod';
 
   return {
     activeCui,

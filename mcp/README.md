@@ -22,10 +22,10 @@ The MCP server reads:
 | File | Purpose |
 |---|---|
 | `~/.config/anaf-cli/credential.yaml` | OAuth client ID + redirect URI (optional if env vars set) |
-| `~/.config/anaf-cli/config.yaml` | Active company CUI and environment (test/prod) |
+| `~/.config/anaf-cli/config.yaml` | Active company CUI (written by `anaf_auth_login`/`anaf_switch_company`) |
 | `~/.local/share/anaf-cli/tokens/_default.json` | Refresh + access tokens |
 
-All three OAuth values (`ANAF_CLIENT_ID`, `ANAF_CLIENT_SECRET`, `ANAF_REDIRECT_URI`) can be provided as env vars instead of using `credential.yaml`. If all three env vars are set, no CLI setup is required.
+All OAuth values (`ANAF_CLIENT_ID`, `ANAF_CLIENT_SECRET`, `ANAF_REDIRECT_URI`) and the environment (`ANAF_ENV=prod|test`, default `prod`) are set as env vars in `mcpServers`. No `anaf-cli` installation required. The token file is shared with `anaf-cli` if you use both.
 
 ## Tools
 
@@ -65,7 +65,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
       "env": {
         "ANAF_CLIENT_ID": "your-oauth-client-id",
         "ANAF_CLIENT_SECRET": "your-oauth-client-secret",
-        "ANAF_REDIRECT_URI": "https://localhost:9002/callback"
+        "ANAF_REDIRECT_URI": "https://localhost:9002/callback",
+        "ANAF_ENV": "prod"
       }
     }
   }
