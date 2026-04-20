@@ -1,0 +1,56 @@
+name: Publish MCP (anaf-mcp)
+
+on:
+  push:
+    tags:
+      - 'mcp-v*.*.*'
+      - 'mcp-v*.*.*-*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build and test but skip npm publish'
+        required: false
+        default: 'true'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build SDK (dependency)
+        run: pnpm --filter @florinszilagyi/anaf-ts-sdk run build
+
+      - name: Verify MCP (lint + build + test)
+        run: pnpm --filter @florinszilagyi/anaf-mcp run verify
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN_INPUT: ${{ github.event.inputs.dry_run }}
+        run: |
+          cd mcp
+          if [ "$EVENT_NAME" = "push" ]; then
+            pnpm publish --no-git-checks --access public
+          else
+            pnpm publish --no-git-checks --access public --dry-run
+          fi
