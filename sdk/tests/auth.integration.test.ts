@@ -240,7 +240,7 @@ describe('ANAF OAuth Authentication & API Client', () => {
 
       // Automatically open browser
       console.log(`🌐 Opening ${authUrl}`);
-      let { error } = tryCatch(async () => {
+      let { error } = await tryCatch(async () => {
         await openBrowser(authUrl);
         console.log('✅ Browser opened successfully');
       });
@@ -258,7 +258,7 @@ describe('ANAF OAuth Authentication & API Client', () => {
       // Wait for auth code with timeout
       const timeoutMs = 180000; // 3 minutes for USB token interaction
 
-      const { data, error: authCodeError } = tryCatch(async () => {
+      const { data, error: authCodeError } = await tryCatch(async () => {
         return await Promise.race([
           await Promise.race([
             authCodePromise,
@@ -277,7 +277,7 @@ describe('ANAF OAuth Authentication & API Client', () => {
 
       console.log('\n🔄 Exchanging authorization code for tokens...');
 
-      const { data: tokens, error: exchangeError } = tryCatch(async () => {
+      const { data: tokens, error: exchangeError } = await tryCatch(async () => {
         const tokens = await authenticator.exchangeCodeForToken(authCode);
 
         expect(tokens).toBeDefined();
@@ -315,7 +315,7 @@ describe('ANAF OAuth Authentication & API Client', () => {
 
       console.log('\n🔄 Testing token refresh...');
 
-      const { data: newTokens, error: refreshError } = tryCatch(async () => {
+      const { data: newTokens, error: refreshError } = await tryCatch(async () => {
         const newTokens = await authenticator.refreshAccessToken(tokens.refresh_token);
 
         expect(newTokens).toBeDefined();
@@ -412,7 +412,7 @@ describe('ANAF OAuth Authentication & API Client', () => {
       }
 
       // Try to decode JWT payload
-      const { error: jwtError } = tryCatch(async () => {
+      const { error: jwtError } = await tryCatch(async () => {
         const payload = decodeJWT(tokens.access_token);
         console.log('\n📜 JWT Payload:');
         console.log(JSON.stringify(payload, null, 2));
@@ -475,7 +475,7 @@ describe('ANAF OAuth Authentication & API Client', () => {
   }
 
   async function loadTokens(): Promise<(TokenResponse & { obtained_at?: number; expires_at?: number }) | null> {
-    const { data, error } = tryCatch(async () => {
+    const { data, error } = await tryCatch(async () => {
       const tokenData = await fs.promises.readFile(tokenFilePath, 'utf-8');
       return JSON.parse(tokenData);
     });
