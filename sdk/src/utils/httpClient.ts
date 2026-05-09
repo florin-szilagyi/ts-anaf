@@ -130,20 +130,26 @@ export class HttpClient {
    * Parse response based on content type or explicit type
    */
   private async parseResponse<T>(response: Response): Promise<T> {
-    const contentType = response.headers.get('content-type') || '';
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
 
-    // For ArrayBuffer responses (PDF files)
-    if (contentType.includes('application/pdf') || contentType.includes('application/octet-stream')) {
-      return response.arrayBuffer() as Promise<T>;
-    }
-
-    // For JSON responses
     if (contentType.includes('application/json')) {
       return response.json() as Promise<T>;
     }
 
-    // Default to text
-    return response.text() as Promise<T>;
+    // Text-shaped content types are explicitly opted in. Anything else
+    // (binary, unknown, or missing content-type) falls through to arrayBuffer
+    // so a new ANAF binary content-type can never silently corrupt bytes via
+    // response.text().
+    if (
+      contentType.startsWith('text/') ||
+      contentType.includes('application/xml') ||
+      /application\/[\w.-]+\+xml/.test(contentType) ||
+      contentType.includes('application/x-www-form-urlencoded')
+    ) {
+      return response.text() as Promise<T>;
+    }
+
+    return response.arrayBuffer() as Promise<T>;
   }
 
   /**

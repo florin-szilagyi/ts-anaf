@@ -87,7 +87,7 @@ export class AnafEfacturaClient {
     return this.efacturaClient.getUploadStatus(uploadId);
   }
 
-  public downloadDocument(downloadId: string): Promise<string> {
+  public downloadDocument(downloadId: string): Promise<Buffer> {
     return this.efacturaClient.downloadDocument(downloadId);
   }
 

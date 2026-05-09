@@ -175,7 +175,7 @@ export class EfacturaClient {
     return data;
   }
 
-  async downloadDocument(downloadId: string): Promise<string> {
+  async downloadDocument(downloadId: string): Promise<Buffer> {
     if (!downloadId?.trim()) {
       throw new AnafValidationError('Download ID is required');
     }
@@ -185,10 +185,10 @@ export class EfacturaClient {
 
     const { data, error } = await tryCatch(async () => {
       const accessToken = await this.tokenManager.getValidAccessToken();
-      const response = await this.httpClient.get<string>(url, {
+      const response = await this.httpClient.get<ArrayBuffer>(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      return response.data;
+      return Buffer.from(response.data);
     });
 
     if (error) {

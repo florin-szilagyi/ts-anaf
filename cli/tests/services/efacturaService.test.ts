@@ -56,7 +56,7 @@ class FakeEfacturaClient {
       idDescarcare: 'download-1',
     })
   );
-  downloadDocument = jest.fn(async (): Promise<string> => Buffer.from('fake-zip').toString('base64'));
+  downloadDocument = jest.fn(async (): Promise<Buffer> => Buffer.from('fake-zip'));
   getMessages = jest.fn(async (): Promise<ListMessagesResponse> => ({ mesaje: [] }) as unknown as ListMessagesResponse);
   getMessagesPaginated = jest.fn(
     async (): Promise<PaginatedListMessagesResponse> => ({ mesaje: [] }) as unknown as PaginatedListMessagesResponse
@@ -419,12 +419,27 @@ describe('EfacturaService.getStatus', () => {
 });
 
 describe('EfacturaService.download', () => {
-  it('decodes the base64 payload to a Buffer', async () => {
+  it('returns the SDK Buffer payload unchanged', async () => {
     const h = harness();
     setupState(h);
     const buf = await h.service.download({ downloadId: 'download-1', clientSecret: 's' });
     expect(Buffer.isBuffer(buf)).toBe(true);
     expect(buf.toString('utf8')).toBe('fake-zip');
+  });
+
+  it('preserves binary integrity for non-UTF-8 zip bytes (regression)', async () => {
+    const h = harness();
+    setupState(h);
+    // ZIP signature + bytes that are not valid UTF-8; would be mangled by a
+    // text() decode/re-encode round-trip.
+    const zipBytes = Buffer.from([
+      0x50, 0x4b, 0x03, 0x04, 0xff, 0xfe, 0xfd, 0xfc, 0x80, 0x81, 0x82, 0xc3, 0x28, 0xa0, 0xa1,
+    ]);
+    h.fakeClient.downloadDocument.mockResolvedValueOnce(zipBytes);
+    const buf = await h.service.download({ downloadId: 'download-1', clientSecret: 's' });
+    expect(Buffer.isBuffer(buf)).toBe(true);
+    expect(buf.length).toBe(zipBytes.length);
+    expect(buf.equals(zipBytes)).toBe(true);
   });
 
   it('wraps SDK download failure as DOWNLOAD_FAILED', async () => {

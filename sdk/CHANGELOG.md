@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-08
+
+### Fixed
+
+- **Binary downloads no longer corrupted.** ANAF returns invoice ZIP archives
+  with `Content-Type: application/zip`, which the HTTP layer was routing
+  through `response.text()` and UTF-8-decoding into garbage bytes.
+  `EfacturaClient.downloadDocument()` now consistently returns intact binary
+  data.
+
+### Changed
+
+- **`EfacturaClient.downloadDocument()` and `AnafEfacturaClient.downloadDocument()`
+  now return `Promise<Buffer>` instead of `Promise<string>`.** The previous
+  string return was always corrupted bytes, so no working consumer could have
+  relied on it; this is a type-level cleanup of a broken contract. Callers
+  should write the buffer straight to disk (or pipe it).
+- **`HttpClient.parseResponse` now defaults to `arrayBuffer()` and only
+  decodes text for known text content types** (`text/*`, `application/xml`,
+  `application/*+xml`, `application/x-www-form-urlencoded`). JSON detection
+  is unchanged. This is a fail-closed posture: a future ANAF endpoint that
+  returns a new binary content-type will surface as `ArrayBuffer` instead of
+  silently corrupting bytes via `text()`.
+
 ## [1.0.0] - 2025-01-25
 
 ### Added

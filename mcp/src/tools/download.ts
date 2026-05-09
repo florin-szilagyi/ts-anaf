@@ -18,8 +18,7 @@ export interface DownloadDeps {
 
 export async function handleDownloadInvoice(input: DownloadInvoiceInput, deps: DownloadDeps): Promise<ToolResult> {
   try {
-    const base64 = await deps.efactura.downloadDocument(input.download_id);
-    const buf = Buffer.from(base64, 'base64');
+    const buf = await deps.efactura.downloadDocument(input.download_id);
     const abs = path.resolve(input.output_path);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, buf);

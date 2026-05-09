@@ -39,7 +39,7 @@ export interface EfacturaClientLike {
   uploadDocument(xml: string, options?: UploadOptions): Promise<UploadResponse>;
   uploadB2CDocument(xml: string, options?: UploadOptions): Promise<UploadResponse>;
   getUploadStatus(uploadId: string): Promise<StatusResponse>;
-  downloadDocument(downloadId: string): Promise<string>;
+  downloadDocument(downloadId: string): Promise<Buffer>;
   getMessages(params: { zile: number; filtru?: MessageFilter }): Promise<ListMessagesResponse>;
   getMessagesPaginated(params: {
     startTime: number;
@@ -205,13 +205,11 @@ export class EfacturaService {
 
   async download(args: DownloadArgs): Promise<Buffer> {
     return this.withClient(args.clientSecret, async (client) => {
-      let base64: string;
       try {
-        base64 = await client.downloadDocument(args.downloadId);
+        return await client.downloadDocument(args.downloadId);
       } catch (cause) {
         throw wrapAnafError('DOWNLOAD_FAILED', 'Failed to download document', cause);
       }
-      return Buffer.from(base64, 'base64');
     });
   }
 

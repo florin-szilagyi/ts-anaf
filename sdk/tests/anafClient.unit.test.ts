@@ -334,18 +334,92 @@ describe('AnafEfacturaClient Unit Tests', () => {
     });
 
     test('should download document successfully', async () => {
+      const zipBytes = Buffer.from(mockDownloadContent, 'utf8');
       (fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
           get: (name: string) => (name === 'content-type' ? 'application/zip' : null),
         },
-        text: () => Promise.resolve(mockDownloadContent),
+        arrayBuffer: () =>
+          Promise.resolve(zipBytes.buffer.slice(zipBytes.byteOffset, zipBytes.byteOffset + zipBytes.byteLength)),
       });
 
       const result = await client.downloadDocument(mockDownloadId);
 
-      expect(result).toBe(mockDownloadContent);
+      expect(Buffer.isBuffer(result)).toBe(true);
+      expect(result.toString('utf8')).toBe(mockDownloadContent);
+    });
+
+    test('should download with application/octet-stream content-type', async () => {
+      const zipBytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0xde, 0xad, 0xbe, 0xef]);
+      (fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => (name === 'content-type' ? 'application/octet-stream' : null),
+        },
+        arrayBuffer: () =>
+          Promise.resolve(zipBytes.buffer.slice(zipBytes.byteOffset, zipBytes.byteOffset + zipBytes.byteLength)),
+      });
+
+      const result = await client.downloadDocument(mockDownloadId);
+
+      expect(Buffer.isBuffer(result)).toBe(true);
+      expect(result.equals(zipBytes)).toBe(true);
+    });
+
+    test('should preserve byte-equality for multi-KB random binary payloads', async () => {
+      // Build a 32 KB pseudo-random payload covering the full 0..255 byte range,
+      // which will always include sequences invalid as UTF-8. The deterministic
+      // generator keeps this hermetic across runs.
+      const size = 32 * 1024;
+      const bytes = Buffer.alloc(size);
+      let seed = 0x1234;
+      for (let i = 0; i < size; i++) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        bytes[i] = seed & 0xff;
+      }
+
+      (fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => (name === 'content-type' ? 'application/zip' : null),
+        },
+        arrayBuffer: () => Promise.resolve(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
+      });
+
+      const result = await client.downloadDocument(mockDownloadId);
+
+      expect(result.length).toBe(size);
+      expect(result.equals(bytes)).toBe(true);
+    });
+
+    test('should preserve binary integrity for application/zip downloads', async () => {
+      // Build a payload that includes bytes which would be mangled by a UTF-8
+      // text() round-trip: the ZIP local-file-header signature 0x50 0x4B 0x03 0x04
+      // followed by high-bit bytes that are not valid UTF-8.
+      const zipBytes = Buffer.from([
+        0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00, 0xff, 0xfe, 0xfd, 0xfc, 0x80, 0x81, 0x82, 0xc3,
+        0x28, 0xa0, 0xa1,
+      ]);
+
+      (fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => (name === 'content-type' ? 'application/zip' : null),
+        },
+        arrayBuffer: () =>
+          Promise.resolve(zipBytes.buffer.slice(zipBytes.byteOffset, zipBytes.byteOffset + zipBytes.byteLength)),
+      });
+
+      const result = await client.downloadDocument(mockDownloadId);
+
+      expect(Buffer.isBuffer(result)).toBe(true);
+      expect(result.length).toBe(zipBytes.length);
+      expect(result.equals(zipBytes)).toBe(true);
     });
 
     test('should validate upload ID for status check', async () => {
