@@ -11,7 +11,7 @@ describe('handleDownloadInvoice', () => {
     try {
       const fakeZip = Buffer.from('PK\u0003\u0004fake zip bytes');
       const mockClient = {
-        downloadDocument: jest.fn<() => Promise<string>>().mockResolvedValue(fakeZip.toString('base64')),
+        downloadDocument: jest.fn<() => Promise<Buffer>>().mockResolvedValue(fakeZip),
       };
       const result = await handleDownloadInvoice(
         { download_id: 'dl-42', output_path: outPath },

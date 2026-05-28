@@ -121,7 +121,7 @@ export function createOAuthCallbackServer(): OAuthCallbackServer {
     app,
     start: (port: number) => {
       return new Promise((resolve, reject) => {
-        const { data, error } = tryCatch(async () => {
+        const { error } = tryCatch(() => {
           server = app.listen(port, () => {
             console.log(
               `🌐 OAuth callback server running on http://localhost:${port}\n` +
@@ -138,7 +138,6 @@ export function createOAuthCallbackServer(): OAuthCallbackServer {
         if (error) {
           reject(error);
         }
-        return data;
       });
     },
 

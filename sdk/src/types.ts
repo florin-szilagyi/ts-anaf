@@ -350,6 +350,21 @@ export interface InvoiceInput {
   lines: InvoiceLine[];
   /** Payment IBAN (optional) */
   paymentIban?: string;
+  /**
+   * UN/ECE 4461 payment means code. Common values:
+   *  10 = In cash, 30 = Credit transfer, 31 = SEPA credit transfer (current default),
+   *  48 = Bank card, 49 = Direct debit, 58 = SEPA credit transfer.
+   *  If omitted and paymentIban is provided, defaults to '31' for backwards compatibility.
+   *  Required if paymentIban is omitted but you still want a PaymentMeans section emitted.
+   */
+  paymentMeansCode?: string;
+  /**
+   * Amount already paid against this invoice, in the invoice currency.
+   * Emitted as cbc:PrepaidAmount inside cac:LegalMonetaryTotal.
+   * CIUS-RO rule BR-CO-25: PayableAmount = TaxInclusiveAmount − PrepaidAmount.
+   * A fully-paid invoice therefore has PayableAmount = 0.00.
+   */
+  prepaidAmount?: number;
   /** Whether supplier is VAT registered */
   isSupplierVatPayer?: boolean;
   /**

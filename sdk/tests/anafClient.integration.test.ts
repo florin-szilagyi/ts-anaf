@@ -100,7 +100,7 @@ describe('AnafEfacturaClient Integration Tests', () => {
       accessToken = tokens.access_token;
       console.log('✅ Using existing valid access token');
     } else if (tokens?.refresh_token) {
-      const { data, error } = tryCatch(async () => {
+      const { error } = await tryCatch(async () => {
         console.log('🔄 Refreshing expired token...');
         const newTokens = await authenticator.refreshAccessToken(tokens.refresh_token);
         accessToken = newTokens.access_token;
@@ -245,7 +245,7 @@ describe('AnafEfacturaClient Integration Tests', () => {
         console.log('ℹ️ No paginated messages found');
       }
     }, 30000);
-
+  });
 
   describe('Document Download Operations', () => {
     test('should handle download request (may not have content)', async () => {
@@ -256,7 +256,7 @@ describe('AnafEfacturaClient Integration Tests', () => {
         const messageWithId = messages.mesaje.find((m) => m.id);
 
         if (messageWithId?.id) {
-          const { error } = tryCatch(async () => {
+          const { error } = await tryCatch(async () => {
             const downloadContent = await client.downloadDocument(messageWithId.id);
             expect(downloadContent).toBeDefined();
             console.log(`✅ Download successful for message ${messageWithId.id}`);
@@ -328,7 +328,7 @@ describe('AnafEfacturaClient Integration Tests', () => {
     });
 
     test('should convert XML to PDF with validation', async () => {
-      const { data, error } = tryCatch(async () => {
+      const { data, error } = await tryCatch(async () => {
         const pdfBuffer = await client.convertXmlToPdf(testXml, 'FACT1');
 
         expect(pdfBuffer).toBeInstanceOf(Buffer);
@@ -348,7 +348,7 @@ describe('AnafEfacturaClient Integration Tests', () => {
     }, 30000);
 
     test('should convert XML to PDF without validation', async () => {
-      const { data, error } = tryCatch(async () => {
+      const { data, error } = await tryCatch(async () => {
         const pdfBuffer = await client.convertXmlToPdfNoValidation(testXml, 'FACT1');
 
         expect(pdfBuffer).toBeInstanceOf(Buffer);
@@ -449,7 +449,7 @@ describe('AnafEfacturaClient Integration Tests', () => {
 
   // Helper functions
   async function loadTokens(): Promise<(TokenResponse & { obtained_at?: number; expires_at?: number }) | null> {
-    const { data, error } = tryCatch(async () => {
+    const { data, error } = await tryCatch(async () => {
       if (fs.existsSync(tokenFilePath)) {
         const tokenData = fs.readFileSync(tokenFilePath, 'utf8');
         return JSON.parse(tokenData);

@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-05-28
+
+### Added
+
+- **`InvoiceInput.paymentMeansCode`** — override the hardcoded `31` (SEPA credit
+  transfer) with any UN/ECE 4461 code (`10` cash, `48` bank card, `30` credit
+  transfer, etc.). Backwards compatible: when omitted and `paymentIban` is set,
+  defaults to `31` to preserve the old behaviour. When `paymentMeansCode` is set
+  without `paymentIban`, the `<cac:PaymentMeans>` block is still emitted but
+  with no `<cac:PayeeFinancialAccount>` — the right shape for cash and card
+  payments captured at a POS / kiosk.
+- **`InvoiceInput.prepaidAmount`** — emit `<cbc:PrepaidAmount>` inside
+  `<cac:LegalMonetaryTotal>` and auto-recompute `<cbc:PayableAmount>` as
+  `TaxInclusiveAmount − PrepaidAmount`, satisfying CIUS-RO rule BR-CO-25.
+  A fully-paid invoice (e.g. cash at kiosk) therefore renders with
+  `PayableAmount = 0.00`. Rejected at build time if `prepaidAmount > grandTotal`
+  (with a 1-cent rounding tolerance) or if it is negative.
+- Validated end-to-end against the live ANAF test-mode validator
+  (`EfacturaToolsClient.validateXml`) — a fully-prepaid cash invoice returns
+  `valid: true`.
+
+## [1.2.0] - 2026-05-08
+
+### Fixed
+
+- **Binary downloads no longer corrupted.** ANAF returns invoice ZIP archives
+  with `Content-Type: application/zip`, which the HTTP layer was routing
+  through `response.text()` and UTF-8-decoding into garbage bytes.
+  `EfacturaClient.downloadDocument()` now consistently returns intact binary
+  data.
+
+### Changed
+
+- **`EfacturaClient.downloadDocument()` and `AnafEfacturaClient.downloadDocument()`
+  now return `Promise<Buffer>` instead of `Promise<string>`.** The previous
+  string return was always corrupted bytes, so no working consumer could have
+  relied on it; this is a type-level cleanup of a broken contract. Callers
+  should write the buffer straight to disk (or pipe it).
+- **`HttpClient.parseResponse` now defaults to `arrayBuffer()` and only
+  decodes text for known text content types** (`text/*`, `application/xml`,
+  `application/*+xml`, `application/x-www-form-urlencoded`). JSON detection
+  is unchanged. This is a fail-closed posture: a future ANAF endpoint that
+  returns a new binary content-type will surface as `ArrayBuffer` instead of
+  silently corrupting bytes via `text()`.
+
 ## [1.0.0] - 2025-01-25
 
 ### Added

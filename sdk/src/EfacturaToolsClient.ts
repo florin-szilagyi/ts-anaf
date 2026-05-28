@@ -169,7 +169,7 @@ export class EfacturaToolsClient {
   private async performPdfConversion(url: string, xmlContent: string, errorContext: string): Promise<Buffer> {
     const { data, error } = await tryCatch(async () => {
       const accessToken = await this.tokenManager.getValidAccessToken();
-      const response = await this.httpClient.post(url, xmlContent, {
+      const response = await this.httpClient.post<ArrayBuffer | Record<string, any>>(url, xmlContent, {
         baseURL: BASE_PATH_OAUTH_PROD,
         headers: {
           'Content-Type': 'text/plain',
@@ -177,17 +177,15 @@ export class EfacturaToolsClient {
         },
       });
 
-      if (response.headers?.get('content-type')?.includes('application/json')) {
-        const errorData = parseJsonResponse(response.data);
+      const contentType = response.headers?.get('content-type')?.toLowerCase() ?? '';
+      if (contentType.includes('application/json')) {
+        const errorData = parseJsonResponse<{ Messages?: Array<{ message: string }> }>(response.data);
         throw new AnafApiError(
-          errorData.Messages ? errorData.Messages.map((m: any) => m.message).join('\n') : 'PDF conversion failed'
+          errorData.Messages ? errorData.Messages.map((m) => m.message).join('\n') : 'PDF conversion failed'
         );
       }
 
-      if (response.data instanceof ArrayBuffer) {
-        return Buffer.from(response.data);
-      }
-      return Buffer.from(response.data as any);
+      return Buffer.from(response.data as ArrayBuffer);
     });
 
     if (error) {

@@ -1,6 +1,6 @@
 {
   "name": "@florinszilagyi/anaf-cli",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "CLI for the ANAF e-Factura SDK (anaf-ts-sdk)",
   "license": "MIT",
   "author": {
