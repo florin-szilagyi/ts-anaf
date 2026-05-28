@@ -5,6 +5,7 @@ import {
   InvoiceLine,
   Party,
   Address,
+  DocumentAllowanceCharge,
   UblInvoiceInput, // Legacy compatibility
 } from '../types';
 import {
@@ -223,6 +224,12 @@ function validateInvoiceInput(input: InvoiceInput): void {
   if (input.lines.length > 0) {
     input.lines.forEach((line, index) => validateLine(line, index));
   }
+
+  // Validate document-level allowances/charges (shape only — tax-category
+  // inheritance/resolution happens later, alongside tax-group computation).
+  if (input.documentAllowanceCharges) {
+    input.documentAllowanceCharges.forEach((ac, index) => validateDocumentAllowanceCharge(ac, index));
+  }
 }
 
 /**
@@ -291,6 +298,177 @@ function validateLine(line: InvoiceLine, index: number): void {
 }
 
 /**
+ * Validate a document-level allowance/charge entry.
+ *
+ * Amount is always positive — the sign is conveyed by `chargeIndicator`, never by
+ * a negative number. Tax-category resolution (inherit-from-lines vs. explicit) is
+ * deferred to {@link resolveAllowanceTaxCategory} because it needs the computed
+ * line tax groups.
+ *
+ * @throws {AnafValidationError} If the entry is malformed.
+ */
+function validateDocumentAllowanceCharge(ac: DocumentAllowanceCharge, index: number): void {
+  const label = `Allowance/Charge ${index + 1}`;
+
+  if (typeof ac.chargeIndicator !== 'boolean') {
+    throw new AnafValidationError(`${label}: chargeIndicator must be a boolean`);
+  }
+
+  if (typeof ac.amount !== 'number' || !Number.isFinite(ac.amount) || ac.amount <= 0) {
+    throw new AnafValidationError(`${label}: amount must be a positive number (sign is carried by chargeIndicator)`);
+  }
+
+  if (!ac.reason || typeof ac.reason !== 'string' || !ac.reason.trim()) {
+    throw new AnafValidationError(`${label}: reason is required`);
+  }
+
+  if (ac.taxPercent !== undefined) {
+    if (typeof ac.taxPercent !== 'number' || ac.taxPercent < 0 || ac.taxPercent > 100) {
+      throw new AnafValidationError(`${label}: taxPercent must be between 0 and 100`);
+    }
+  }
+}
+
+/**
+ * Resolved tax-category metadata for a document-level allowance or charge.
+ */
+interface ResolvedAllowanceTaxCategory {
+  categoryId: string;
+  /** Undefined when categoryId === 'O' (BR-O-05 forbids cbc:Percent). */
+  percent?: number;
+  exemptionReasonCode?: string;
+}
+
+/**
+ * Resolve the tax category for a document-level allowance/charge.
+ *
+ * Resolution order:
+ *  1. If both `taxCategoryId` and `taxPercent` are explicit on the allowance, use them.
+ *  2. If `taxCategoryId` is explicit but `taxPercent` is missing, infer the percent from
+ *     the matching line tax group (or default to 0 for 'Z'/'O', error if 'S' has no match).
+ *  3. If neither is explicit and the lines have a single tax group, inherit from it.
+ *  4. Otherwise (lines have mixed tax groups), throw — caller must disambiguate.
+ *
+ * @throws {AnafValidationError} If lines have mixed tax categories and the allowance
+ *   does not specify `taxCategoryId`, or if an explicit `taxCategoryId` references
+ *   a standard-rated ('S') category with no matching line group to infer the percent from.
+ */
+function resolveAllowanceTaxCategory(
+  ac: DocumentAllowanceCharge,
+  index: number,
+  taxGroups: TaxGroup[],
+  isSupplierVatPayer: boolean
+): ResolvedAllowanceTaxCategory {
+  const label = `Allowance/Charge ${index + 1}`;
+
+  // If supplier is non-VAT, every allowance/charge must be category 'O' too —
+  // mirroring how every line gets coerced to 'O' in groupLinesByTax.
+  if (!isSupplierVatPayer) {
+    if (ac.taxCategoryId && ac.taxCategoryId !== 'O') {
+      throw new AnafValidationError(
+        `${label}: taxCategoryId must be 'O' when supplier is not VAT-registered, got '${ac.taxCategoryId}'`
+      );
+    }
+    return { categoryId: 'O', exemptionReasonCode: 'VATEX-EU-O' };
+  }
+
+  // Explicit category provided.
+  if (ac.taxCategoryId) {
+    const matching = taxGroups.find((g) => g.categoryId === ac.taxCategoryId);
+    let percent: number;
+    if (ac.taxPercent !== undefined) {
+      percent = ac.taxPercent;
+    } else if (matching) {
+      percent = matching.percent;
+    } else if (ac.taxCategoryId === 'Z') {
+      percent = 0;
+    } else {
+      throw new AnafValidationError(
+        `${label}: taxPercent is required when taxCategoryId='${ac.taxCategoryId}' does not match any line tax category`
+      );
+    }
+    // BR-O-05: category 'O' must not carry cbc:Percent.
+    if (ac.taxCategoryId === 'O') {
+      return { categoryId: 'O', exemptionReasonCode: matching?.exemptionReasonCode ?? 'VATEX-EU-O' };
+    }
+    return { categoryId: ac.taxCategoryId, percent, exemptionReasonCode: matching?.exemptionReasonCode };
+  }
+
+  // Inherit from lines.
+  if (taxGroups.length === 0) {
+    throw new AnafValidationError(`${label}: taxCategoryId is required when the invoice has no lines to inherit from`);
+  }
+  if (taxGroups.length > 1) {
+    const categories = taxGroups.map((g) => g.categoryId).join(', ');
+    throw new AnafValidationError(
+      `${label}: taxCategoryId is required because invoice lines have mixed tax categories (${categories})`
+    );
+  }
+
+  const onlyGroup = taxGroups[0];
+  return {
+    categoryId: onlyGroup.categoryId,
+    percent: onlyGroup.categoryId === 'O' ? undefined : (ac.taxPercent ?? onlyGroup.percent),
+    exemptionReasonCode: onlyGroup.exemptionReasonCode,
+  };
+}
+
+/**
+ * Apply resolved document-level allowances/charges to the per-category tax groups.
+ *
+ * For each allowance (`chargeIndicator=false`), the matching group's `taxableAmount`
+ * is decreased; for each charge (`chargeIndicator=true`), it is increased. The
+ * group's `taxAmount` is then re-derived from the adjusted taxable amount and the
+ * group's percent. This satisfies CIUS-RO BR-CO-17 / BR-DEC-19, where each
+ * `cac:TaxSubtotal` reflects the apportioned base after document-level adjustments.
+ *
+ * Returns a new array; the input array is not mutated.
+ */
+function applyAllowancesToTaxGroups(
+  taxGroups: TaxGroup[],
+  resolvedAllowances: Array<{ ac: DocumentAllowanceCharge; resolved: ResolvedAllowanceTaxCategory }>
+): TaxGroup[] {
+  if (resolvedAllowances.length === 0) {
+    return taxGroups;
+  }
+
+  // Clone so we don't mutate the caller's groups.
+  const groupsByCategory = new Map<string, TaxGroup>();
+  taxGroups.forEach((g) => groupsByCategory.set(g.categoryId, { ...g }));
+
+  resolvedAllowances.forEach(({ ac, resolved }) => {
+    let group = groupsByCategory.get(resolved.categoryId);
+    if (!group) {
+      // No line was rated at this category — create an empty group so the
+      // adjustment still appears in the VAT breakdown.
+      group = {
+        categoryId: resolved.categoryId,
+        percent: resolved.percent ?? 0,
+        taxableAmount: 0,
+        taxAmount: 0,
+        exemptionReasonCode: resolved.exemptionReasonCode,
+      };
+      groupsByCategory.set(resolved.categoryId, group);
+    }
+
+    const delta = ac.chargeIndicator ? ac.amount : -ac.amount;
+    group.taxableAmount = parseFloat((group.taxableAmount + delta).toFixed(2));
+  });
+
+  // Re-derive taxAmount from the adjusted taxableAmount, except for category 'O'
+  // (not subject to VAT) which always has taxAmount = 0 and no percent.
+  groupsByCategory.forEach((group) => {
+    if (group.categoryId === 'O') {
+      group.taxAmount = 0;
+    } else {
+      group.taxAmount = parseFloat((group.taxableAmount * (group.percent / 100)).toFixed(2));
+    }
+  });
+
+  return Array.from(groupsByCategory.values());
+}
+
+/**
  * Build comprehensive UBL 2.1 Invoice XML
  *
  * This function creates a complete UBL 2.1 XML invoice that complies with
@@ -348,11 +526,46 @@ export function buildInvoiceXml(input: InvoiceInput): string {
   const issueDate = formatDateForAnaf(input.issueDate);
   const dueDate = input.dueDate ? formatDateForAnaf(input.dueDate) : issueDate;
 
-  // Calculate tax groups and totals
-  const taxGroups = input.lines.length > 0 ? groupLinesByTax(input.lines, isSupplierVatPayer) : [];
-  const totalTaxableAmount = taxGroups.reduce((sum, group) => sum + group.taxableAmount, 0);
-  const totalTaxAmount = taxGroups.reduce((sum, group) => sum + group.taxAmount, 0);
-  const grandTotal = parseFloat((totalTaxableAmount + totalTaxAmount).toFixed(2));
+  // Calculate tax groups from lines only — the sum of these taxableAmounts is
+  // BT-106 LineExtensionAmount, which is unaffected by document-level allowances.
+  const lineTaxGroups = input.lines.length > 0 ? groupLinesByTax(input.lines, isSupplierVatPayer) : [];
+  const lineExtensionAmount = parseFloat(lineTaxGroups.reduce((sum, group) => sum + group.taxableAmount, 0).toFixed(2));
+
+  // Resolve document-level allowance/charge tax categories now that we know the
+  // line tax groups. This either inherits or validates the explicit categoryId
+  // against the lines' groups.
+  const allowances = input.documentAllowanceCharges ?? [];
+  const resolvedAllowances = allowances.map((ac, index) => ({
+    ac,
+    resolved: resolveAllowanceTaxCategory(ac, index, lineTaxGroups, isSupplierVatPayer),
+  }));
+
+  // BT-107 AllowanceTotalAmount and BT-108 ChargeTotalAmount — summed across all
+  // document-level allowances/charges, irrespective of tax category.
+  const allowanceTotalAmount = parseFloat(
+    resolvedAllowances
+      .filter(({ ac }) => !ac.chargeIndicator)
+      .reduce((sum, { ac }) => sum + ac.amount, 0)
+      .toFixed(2)
+  );
+  const chargeTotalAmount = parseFloat(
+    resolvedAllowances
+      .filter(({ ac }) => ac.chargeIndicator)
+      .reduce((sum, { ac }) => sum + ac.amount, 0)
+      .toFixed(2)
+  );
+
+  // Apply allowances/charges to the per-category tax groups so cac:TaxSubtotal
+  // reflects the post-adjustment base (BR-CO-17 / BR-DEC-19).
+  const taxGroups = applyAllowancesToTaxGroups(lineTaxGroups, resolvedAllowances);
+  const totalTaxableAmount = parseFloat(taxGroups.reduce((sum, group) => sum + group.taxableAmount, 0).toFixed(2));
+  const totalTaxAmount = parseFloat(taxGroups.reduce((sum, group) => sum + group.taxAmount, 0).toFixed(2));
+  // BT-109 TaxExclusiveAmount = LineExtension − AllowanceTotal + ChargeTotal.
+  // Equivalent to the post-adjustment sum of group taxable amounts; we compute it
+  // explicitly so the equality is auditable and resilient to floating-point drift.
+  const taxExclusiveAmount = parseFloat((lineExtensionAmount - allowanceTotalAmount + chargeTotalAmount).toFixed(2));
+  // BT-112 TaxInclusiveAmount = TaxExclusive + TaxAmount.
+  const grandTotal = parseFloat((taxExclusiveAmount + totalTaxAmount).toFixed(2));
 
   // Create XML document
   const root = create({ version: '1.0', encoding: 'UTF-8' }).ele('Invoice', {
@@ -425,6 +638,42 @@ export function buildInvoiceXml(input: InvoiceInput): string {
 
     paymentMeansElement.up();
   }
+
+  // Document-level AllowanceCharge entries — emitted after PaymentMeans and before
+  // TaxTotal, per UBL 2.1 schema ordering. Each entry carries a TaxCategory so the
+  // ANAF schematron (BR-CO-17, BR-DEC-19) can apportion the adjustment to the
+  // matching tax subtotal.
+  resolvedAllowances.forEach(({ ac, resolved }) => {
+    const reasonCode = ac.reasonCode ?? (ac.chargeIndicator ? 'ZZZ' : '95');
+
+    const acElement = root
+      .ele('cac:AllowanceCharge')
+      .ele('cbc:ChargeIndicator')
+      .txt(ac.chargeIndicator ? 'true' : 'false')
+      .up()
+      .ele('cbc:AllowanceChargeReasonCode')
+      .txt(reasonCode)
+      .up()
+      .ele('cbc:AllowanceChargeReason')
+      .txt(ac.reason)
+      .up()
+      .ele('cbc:Amount', { currencyID: currency })
+      .txt(ac.amount.toFixed(2))
+      .up();
+
+    const taxCategoryElement = acElement.ele('cac:TaxCategory').ele('cbc:ID').txt(resolved.categoryId).up();
+
+    // BR-O-05: category 'O' (Not subject to VAT) must not contain cbc:Percent.
+    if (resolved.categoryId !== 'O' && resolved.percent !== undefined) {
+      taxCategoryElement.ele('cbc:Percent').txt(resolved.percent.toFixed(2)).up();
+    }
+
+    if (resolved.exemptionReasonCode) {
+      taxCategoryElement.ele('cbc:TaxExemptionReasonCode').txt(resolved.exemptionReasonCode).up();
+    }
+
+    taxCategoryElement.ele('cac:TaxScheme').ele('cbc:ID').txt('VAT').up().up().up(); // close TaxCategory + AllowanceCharge
+  });
 
   // Tax total with subtotals for each tax group
   const taxTotalElement = root
@@ -519,17 +768,33 @@ export function buildInvoiceXml(input: InvoiceInput): string {
   // (e.g. grandTotal=119.00, prepaidAmount=119.005 → -0.01 before clamping).
   const payableAmount = Math.max(0, parseFloat((grandTotal - prepaidAmount).toFixed(2)));
 
+  // BT-106 LineExtensionAmount is the sum of line nets (unchanged by document-level
+  // allowances/charges). BT-109 TaxExclusiveAmount differs from LineExtensionAmount
+  // whenever AllowanceTotalAmount or ChargeTotalAmount is non-zero.
   const legalMonetaryTotal = root
     .ele('cac:LegalMonetaryTotal')
     .ele('cbc:LineExtensionAmount', { currencyID: currency })
-    .txt(totalTaxableAmount.toFixed(2))
+    .txt(lineExtensionAmount.toFixed(2))
     .up()
     .ele('cbc:TaxExclusiveAmount', { currencyID: currency })
-    .txt(totalTaxableAmount.toFixed(2))
+    .txt(taxExclusiveAmount.toFixed(2))
     .up()
     .ele('cbc:TaxInclusiveAmount', { currencyID: currency })
     .txt(grandTotal.toFixed(2))
     .up();
+
+  // BT-107 / BT-108 — emit only when non-zero, matching the conditional-emit
+  // posture used elsewhere (e.g. PrepaidAmount).
+  if (allowanceTotalAmount > 0) {
+    legalMonetaryTotal
+      .ele('cbc:AllowanceTotalAmount', { currencyID: currency })
+      .txt(allowanceTotalAmount.toFixed(2))
+      .up();
+  }
+
+  if (chargeTotalAmount > 0) {
+    legalMonetaryTotal.ele('cbc:ChargeTotalAmount', { currencyID: currency }).txt(chargeTotalAmount.toFixed(2)).up();
+  }
 
   if (prepaidAmount > 0) {
     legalMonetaryTotal.ele('cbc:PrepaidAmount', { currencyID: currency }).txt(prepaidAmount.toFixed(2)).up();

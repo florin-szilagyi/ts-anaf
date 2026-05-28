@@ -327,6 +327,58 @@ export interface InvoiceLine {
 }
 
 /**
+ * Document-level allowance (discount) or charge.
+ *
+ * Emitted as a `cac:AllowanceCharge` child of `cac:Invoice`. Each entry reduces
+ * (allowance) or increases (charge) the invoice `TaxExclusiveAmount` before VAT
+ * is computed, and CIUS-RO requires every allowance/charge to carry a tax
+ * category so the VAT breakdown can be apportioned correctly (BR-CO-17,
+ * BR-DEC-19).
+ *
+ * This is the canonical UBL/CIUS-RO way to express things like voucher
+ * discounts or surcharges — do not encode them as negative-priced
+ * `InvoiceLine` entries (which is invalid UBL and rejected by the SDK's
+ * `unitPrice >= 0` validation).
+ *
+ * @example Voucher discount of 45 RON on a 50 RON, 0%-rated invoice
+ * ```typescript
+ * documentAllowanceCharges: [
+ *   { chargeIndicator: false, amount: 45, reason: 'Voucher' }
+ * ]
+ * ```
+ */
+export interface DocumentAllowanceCharge {
+  /** `false` = allowance (discount), `true` = charge (extra fee). */
+  chargeIndicator: boolean;
+  /**
+   * Amount > 0 in the invoice currency, regardless of indicator.
+   * Sign is conveyed by `chargeIndicator`, never by a negative `amount`.
+   */
+  amount: number;
+  /** Human-readable reason, e.g. "Voucher", "Loyalty discount", "Shipping fee". */
+  reason: string;
+  /**
+   * Reason code.
+   * - For allowances (`chargeIndicator=false`), UN/CEFACT 5189; defaults to `'95'` (Discount).
+   * - For charges (`chargeIndicator=true`), UN/CEFACT 7161; defaults to `'ZZZ'` (Mutually defined).
+   */
+  reasonCode?: string;
+  /**
+   * VAT category ID per UN/CEFACT 5305 (`'S'` standard, `'Z'` zero, `'AE'` reverse charge,
+   * `'O'` not subject to VAT, etc.).
+   * If omitted, inferred from the invoice lines when they share a single tax category;
+   * if the lines have mixed categories, an explicit value is required.
+   */
+  taxCategoryId?: string;
+  /**
+   * VAT percent for this allowance/charge's tax category. If omitted, inferred from
+   * the invoice lines when they share a single tax category. Category `'O'` must
+   * not carry a percent (CIUS-RO BR-O-05).
+   */
+  taxPercent?: number;
+}
+
+/**
  * Complete invoice data for UBL generation
  */
 export interface InvoiceInput {
@@ -374,6 +426,21 @@ export interface InvoiceInput {
    * applicable exchange rate.
    */
   taxCurrencyTaxAmount?: number;
+  /**
+   * Document-level allowances (discounts) and charges (extra fees), emitted as
+   * `cac:AllowanceCharge` children of `cac:Invoice`. Each allowance reduces the
+   * `TaxExclusiveAmount` before VAT is computed; each charge increases it.
+   *
+   * Use this for voucher discounts, loyalty/promo deductions, shipping fees, etc.
+   * Do not encode discounts as negative-priced `InvoiceLine` entries — that is
+   * invalid UBL and the SDK enforces `unitPrice >= 0`.
+   *
+   * Backwards compatible: when omitted (or empty), the emitted XML and totals are
+   * identical to previous versions.
+   *
+   * @see DocumentAllowanceCharge
+   */
+  documentAllowanceCharges?: DocumentAllowanceCharge[];
 }
 
 /**

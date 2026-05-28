@@ -1373,6 +1373,282 @@ describe('UblBuilder Tests', () => {
     });
   });
 
+  describe('Document-level AllowanceCharge (vouchers / discounts / surcharges)', () => {
+    /**
+     * Baseline used in this block: a single 0%-rated line of 50 RON (the canonical
+     * voucher use-case from the kiosk consumer). The customer pays 5 RON after a
+     * 45 RON voucher is applied at document level.
+     */
+    const baseVoucherInvoice = (): InvoiceInput => ({
+      ...mockTestData.invoiceData,
+      lines: [{ description: 'Wash service', quantity: 1, unitPrice: 50, taxPercent: 0 }],
+    });
+
+    test('omitting documentAllowanceCharges keeps XML byte-identical to v1.3.1 baseline', () => {
+      const without = builder.generateInvoiceXml(mockTestData.invoiceData);
+      const withEmpty = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        documentAllowanceCharges: [],
+      });
+
+      // Empty array == omitted: no AllowanceCharge block, no Allowance/Charge totals,
+      // identical LegalMonetaryTotal numbers.
+      expect(without).not.toContain('cac:AllowanceCharge');
+      expect(withEmpty).not.toContain('cac:AllowanceCharge');
+      expect(without).not.toContain('cbc:AllowanceTotalAmount');
+      expect(withEmpty).not.toContain('cbc:AllowanceTotalAmount');
+      expect(without).toBe(withEmpty);
+    });
+
+    test('voucher discount: 50 RON line, 45 RON allowance, prepaid 5 → PayableAmount 0', () => {
+      const xml = builder.generateInvoiceXml({
+        ...baseVoucherInvoice(),
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 45, reason: 'Voucher' },
+        ],
+        prepaidAmount: 5,
+      });
+
+      // The AllowanceCharge block itself.
+      expect(xml).toContain('<cac:AllowanceCharge>');
+      expect(xml).toContain('<cbc:ChargeIndicator>false</cbc:ChargeIndicator>');
+      expect(xml).toContain('<cbc:AllowanceChargeReasonCode>95</cbc:AllowanceChargeReasonCode>');
+      expect(xml).toContain('<cbc:AllowanceChargeReason>Voucher</cbc:AllowanceChargeReason>');
+      expect(xml).toContain('<cbc:Amount currencyID="RON">45.00</cbc:Amount>');
+      // Tax category inherited from the single 0%-rated line group ('Z').
+      // (LegalMonetaryTotal totals are asserted below; here we just sanity-check
+      // the AllowanceCharge's nested TaxCategory id.)
+      const acStart = xml.indexOf('<cac:AllowanceCharge>');
+      const acEnd = xml.indexOf('</cac:AllowanceCharge>');
+      const acBlock = xml.substring(acStart, acEnd);
+      expect(acBlock).toContain('<cbc:ID>Z</cbc:ID>');
+      expect(acBlock).toContain('<cbc:Percent>0.00</cbc:Percent>');
+
+      // LegalMonetaryTotal: LineExtension 50, Allowance 45, TaxExclusive 5, TaxInclusive 5,
+      // Prepaid 5, Payable 0.
+      expect(xml).toContain('<cbc:LineExtensionAmount currencyID="RON">50.00</cbc:LineExtensionAmount>');
+      expect(xml).toContain('<cbc:AllowanceTotalAmount currencyID="RON">45.00</cbc:AllowanceTotalAmount>');
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">5.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">5.00</cbc:TaxInclusiveAmount>');
+      expect(xml).toContain('<cbc:PrepaidAmount currencyID="RON">5.00</cbc:PrepaidAmount>');
+      expect(xml).toContain('<cbc:PayableAmount currencyID="RON">0.00</cbc:PayableAmount>');
+
+      // TaxSubtotal for category Z is decremented by the allowance: 50 − 45 = 5.
+      const taxSubtotalStart = xml.indexOf('<cac:TaxSubtotal>');
+      const taxSubtotalEnd = xml.indexOf('</cac:TaxSubtotal>') + '</cac:TaxSubtotal>'.length;
+      const taxSubtotal = xml.substring(taxSubtotalStart, taxSubtotalEnd);
+      expect(taxSubtotal).toContain('<cbc:TaxableAmount currencyID="RON">5.00</cbc:TaxableAmount>');
+      expect(taxSubtotal).toContain('<cbc:TaxAmount currencyID="RON">0.00</cbc:TaxAmount>');
+      expect(taxSubtotal).toContain('<cbc:ID>Z</cbc:ID>');
+    });
+
+    test('explicit taxCategoryId=Z and taxPercent=0 emit the expected AllowanceCharge XML shape', () => {
+      const xml = builder.generateInvoiceXml({
+        ...baseVoucherInvoice(),
+        documentAllowanceCharges: [
+          {
+            chargeIndicator: false,
+            amount: 10,
+            reason: 'Loyalty',
+            taxCategoryId: 'Z',
+            taxPercent: 0,
+          },
+        ],
+      });
+
+      // Verify TaxScheme is nested under TaxCategory.
+      const acStart = xml.indexOf('<cac:AllowanceCharge>');
+      const acEnd = xml.indexOf('</cac:AllowanceCharge>');
+      const block = xml.substring(acStart, acEnd);
+      expect(block).toContain('<cac:TaxCategory>');
+      expect(block).toContain('<cbc:ID>Z</cbc:ID>');
+      expect(block).toContain('<cbc:Percent>0.00</cbc:Percent>');
+      expect(block).toContain('<cac:TaxScheme>');
+      expect(block).toContain('<cbc:ID>VAT</cbc:ID>');
+    });
+
+    test('charge (chargeIndicator=true) increases TaxExclusiveAmount and defaults to ZZZ reason code', () => {
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        // Single 19%-rated 100 RON line → TaxExclusive 100, TaxInclusive 119.
+        // Add 10 RON shipping charge → TaxExclusive 110, Tax 20.90, TaxInclusive 130.90.
+        documentAllowanceCharges: [{ chargeIndicator: true, amount: 10, reason: 'Shipping' }],
+      });
+
+      expect(xml).toContain('<cbc:ChargeIndicator>true</cbc:ChargeIndicator>');
+      expect(xml).toContain('<cbc:AllowanceChargeReasonCode>ZZZ</cbc:AllowanceChargeReasonCode>');
+      expect(xml).toContain('<cbc:AllowanceChargeReason>Shipping</cbc:AllowanceChargeReason>');
+      expect(xml).toContain('<cbc:Amount currencyID="RON">10.00</cbc:Amount>');
+      expect(xml).toContain('<cbc:LineExtensionAmount currencyID="RON">100.00</cbc:LineExtensionAmount>');
+      expect(xml).toContain('<cbc:ChargeTotalAmount currencyID="RON">10.00</cbc:ChargeTotalAmount>');
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">110.00</cbc:TaxExclusiveAmount>');
+      // 110 * 19% = 20.90 → TaxInclusive 130.90.
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">130.90</cbc:TaxInclusiveAmount>');
+      expect(xml).not.toContain('cbc:AllowanceTotalAmount');
+    });
+
+    test('allowance inherits tax category from a single-category lines array', () => {
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        // Single 19%-rated line → group is { S, 19% }.
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 20, reason: 'Promo' }],
+      });
+
+      const acStart = xml.indexOf('<cac:AllowanceCharge>');
+      const acEnd = xml.indexOf('</cac:AllowanceCharge>');
+      const block = xml.substring(acStart, acEnd);
+      expect(block).toContain('<cbc:ID>S</cbc:ID>');
+      expect(block).toContain('<cbc:Percent>19.00</cbc:Percent>');
+
+      // Math: line 100 @ 19% → LineExt 100. Allowance 20 → TaxExclusive 80,
+      // Tax 80 * 19% = 15.20, TaxInclusive 95.20.
+      expect(xml).toContain('<cbc:LineExtensionAmount currencyID="RON">100.00</cbc:LineExtensionAmount>');
+      expect(xml).toContain('<cbc:AllowanceTotalAmount currencyID="RON">20.00</cbc:AllowanceTotalAmount>');
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">80.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">95.20</cbc:TaxInclusiveAmount>');
+    });
+
+    test('mixed-category lines + no explicit taxCategoryId throws AnafValidationError', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        lines: [
+          { description: 'Standard rated', quantity: 1, unitPrice: 100, taxPercent: 19 },
+          { description: 'Zero rated', quantity: 1, unitPrice: 50, taxPercent: 0 },
+        ],
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 10, reason: 'Promo' }],
+      };
+
+      expect(() => builder.generateInvoiceXml(invoiceData)).toThrow(/mixed tax categories/);
+    });
+
+    test('amount <= 0 throws AnafValidationError', () => {
+      expect(() =>
+        builder.generateInvoiceXml({
+          ...baseVoucherInvoice(),
+          documentAllowanceCharges: [{ chargeIndicator: false, amount: 0, reason: 'Voucher' }],
+        })
+      ).toThrow(/positive number/);
+
+      expect(() =>
+        builder.generateInvoiceXml({
+          ...baseVoucherInvoice(),
+          documentAllowanceCharges: [{ chargeIndicator: false, amount: -5, reason: 'Voucher' }],
+        })
+      ).toThrow(/positive number/);
+    });
+
+    test('empty reason string throws AnafValidationError', () => {
+      expect(() =>
+        builder.generateInvoiceXml({
+          ...baseVoucherInvoice(),
+          documentAllowanceCharges: [{ chargeIndicator: false, amount: 10, reason: '   ' }],
+        })
+      ).toThrow(/reason is required/);
+    });
+
+    test('AllowanceCharge is emitted after PaymentMeans and before TaxTotal (UBL 2.1 ordering)', () => {
+      const xml = builder.generateInvoiceXml({
+        ...baseVoucherInvoice(),
+        paymentMeansCode: '10',
+        prepaidAmount: 5,
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 45, reason: 'Voucher' }],
+      });
+
+      const paymentMeansIdx = xml.indexOf('<cac:PaymentMeans>');
+      const allowanceIdx = xml.indexOf('<cac:AllowanceCharge>');
+      const taxTotalIdx = xml.indexOf('<cac:TaxTotal>');
+
+      expect(paymentMeansIdx).toBeGreaterThan(0);
+      expect(allowanceIdx).toBeGreaterThan(paymentMeansIdx);
+      expect(taxTotalIdx).toBeGreaterThan(allowanceIdx);
+    });
+
+    test('LegalMonetaryTotal children appear in UBL 2.1 schema order', () => {
+      const xml = builder.generateInvoiceXml({
+        ...baseVoucherInvoice(),
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 45, reason: 'Voucher' }],
+        prepaidAmount: 5,
+      });
+
+      const start = xml.indexOf('<cac:LegalMonetaryTotal>');
+      const end = xml.indexOf('</cac:LegalMonetaryTotal>', start);
+      const section = xml.substring(start, end);
+
+      const lineExtIdx = section.indexOf('cbc:LineExtensionAmount');
+      const taxExclIdx = section.indexOf('cbc:TaxExclusiveAmount');
+      const taxInclIdx = section.indexOf('cbc:TaxInclusiveAmount');
+      const allowanceIdx = section.indexOf('cbc:AllowanceTotalAmount');
+      const prepaidIdx = section.indexOf('cbc:PrepaidAmount');
+      const payableIdx = section.indexOf('cbc:PayableAmount');
+
+      expect(lineExtIdx).toBeGreaterThan(-1);
+      expect(taxExclIdx).toBeGreaterThan(lineExtIdx);
+      expect(taxInclIdx).toBeGreaterThan(taxExclIdx);
+      expect(allowanceIdx).toBeGreaterThan(taxInclIdx);
+      expect(prepaidIdx).toBeGreaterThan(allowanceIdx);
+      expect(payableIdx).toBeGreaterThan(prepaidIdx);
+    });
+
+    test('multiple allowances accumulate into AllowanceTotalAmount', () => {
+      const xml = builder.generateInvoiceXml({
+        ...baseVoucherInvoice(),
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 5, reason: 'Voucher A' },
+          { chargeIndicator: false, amount: 10, reason: 'Voucher B' },
+        ],
+      });
+
+      // 50 line - 15 total allowances = 35 TaxExclusive (0% VAT → 35 TaxInclusive too).
+      expect(xml).toContain('<cbc:AllowanceTotalAmount currencyID="RON">15.00</cbc:AllowanceTotalAmount>');
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">35.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">35.00</cbc:TaxInclusiveAmount>');
+
+      // Both AllowanceCharge blocks emitted.
+      const acCount = (xml.match(/<cac:AllowanceCharge>/g) ?? []).length;
+      expect(acCount).toBe(2);
+    });
+
+    test('custom reasonCode overrides the default', () => {
+      const xml = builder.generateInvoiceXml({
+        ...baseVoucherInvoice(),
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 5, reason: 'Marketing promo', reasonCode: '102' },
+        ],
+      });
+
+      expect(xml).toContain('<cbc:AllowanceChargeReasonCode>102</cbc:AllowanceChargeReasonCode>');
+    });
+
+    test('non-VAT supplier (category O): allowance is coerced to O and has no Percent', () => {
+      const nonVatSupplier: Party = {
+        ...mockTestData.invoiceData.supplier,
+        vatNumber: undefined,
+      };
+
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        supplier: nonVatSupplier,
+        isSupplierVatPayer: false,
+        lines: [{ description: 'Service', quantity: 1, unitPrice: 100, taxPercent: 0 }],
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 30, reason: 'Discount' }],
+      });
+
+      const acStart = xml.indexOf('<cac:AllowanceCharge>');
+      const acEnd = xml.indexOf('</cac:AllowanceCharge>');
+      const block = xml.substring(acStart, acEnd);
+      expect(block).toContain('<cbc:ID>O</cbc:ID>');
+      // BR-O-05: cbc:Percent must NOT appear for category O.
+      expect(block).not.toContain('<cbc:Percent>');
+      expect(block).toContain('<cbc:TaxExemptionReasonCode>VATEX-EU-O</cbc:TaxExemptionReasonCode>');
+
+      // Math: line 100 - allowance 30 = TaxExclusive 70, no tax, TaxInclusive 70.
+      expect(xml).toContain('<cbc:LineExtensionAmount currencyID="RON">100.00</cbc:LineExtensionAmount>');
+      expect(xml).toContain('<cbc:AllowanceTotalAmount currencyID="RON">30.00</cbc:AllowanceTotalAmount>');
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">70.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">70.00</cbc:TaxInclusiveAmount>');
+    });
+  });
+
   describe('Performance Tests', () => {
     test('should generate XML quickly for simple invoices', () => {
       const start = Date.now();

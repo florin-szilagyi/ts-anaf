@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-05-29
+
+### Added
+
+- **`InvoiceInput.documentAllowanceCharges`** — document-level allowances
+  (discounts) and charges (extra fees), emitted as `cac:AllowanceCharge`
+  children of `cac:Invoice` per UBL 2.1 / CIUS-RO. This is the canonical way
+  to express things like voucher discounts on a kiosk receipt — previously
+  callers tried to encode them as negative-priced `InvoiceLine` entries,
+  which is invalid UBL and rejected by the SDK's `unitPrice >= 0`
+  validation.
+
+  ```typescript
+  // 50 RON service, 45 RON voucher discount, customer pays 5 RON.
+  builder.generateInvoiceXml({
+    // ...
+    lines: [{ description: 'Wash', quantity: 1, unitPrice: 50, taxPercent: 0 }],
+    documentAllowanceCharges: [
+      { chargeIndicator: false, amount: 45, reason: 'Voucher' },
+    ],
+    prepaidAmount: 5, // → PayableAmount = 0
+  });
+  ```
+
+  Each allowance/charge carries a `TaxCategory` (inherited from the lines
+  when they share a single category, or explicit via `taxCategoryId` +
+  `taxPercent`). `LegalMonetaryTotal` is recomputed accordingly:
+  `TaxExclusiveAmount = LineExtension − AllowanceTotal + ChargeTotal`, and
+  the matching `cac:TaxSubtotal` taxable base is adjusted to satisfy
+  BR-CO-17 / BR-DEC-19. `cbc:AllowanceTotalAmount` (BT-107) and
+  `cbc:ChargeTotalAmount` (BT-108) are emitted when non-zero.
+
+  Defaults that minimize caller pain:
+  - `reasonCode` defaults to `'95'` (Discount) for allowances and `'ZZZ'`
+    (Mutually defined) for charges.
+  - `taxCategoryId` / `taxPercent` are inherited from the lines' single tax
+    group; an `AnafValidationError` is thrown if the lines have mixed
+    categories and the allowance doesn't disambiguate.
+  - Non-VAT suppliers (`isSupplierVatPayer: false`) coerce every
+    allowance/charge to category `'O'` with the matching
+    `VATEX-EU-O` exemption code, mirroring how line tax categories are
+    coerced.
+
+  Validation: each entry must have `amount > 0` and a non-empty `reason`.
+
+  Backwards compatible: omitting the field (or passing `[]`) produces XML
+  byte-identical to v1.3.1.
+
 ## [1.3.0] - 2026-05-28
 
 ### Added
