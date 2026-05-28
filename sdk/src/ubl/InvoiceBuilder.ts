@@ -404,19 +404,26 @@ export function buildInvoiceXml(input: InvoiceInput): string {
   buildPartyXml(root, 'cac:AccountingSupplierParty', input.supplier, isSupplierVatPayer);
   buildPartyXml(root, 'cac:AccountingCustomerParty', input.customer, isSupplierVatPayer);
 
-  // Payment means (if IBAN provided)
-  if (input.paymentIban) {
-    root
+  // Payment means — emitted when either a means code or an IBAN is provided.
+  //
+  // Backwards compatibility: when only `paymentIban` is set, defaults to UN/ECE 4461
+  // code '31' (SEPA Credit Transfer) — the original hardcoded behaviour.
+  //
+  // Callers can pass `paymentMeansCode` (e.g. '10' cash, '48' bank card) to declare
+  // payments that already happened; in that case `paymentIban` is typically omitted
+  // and no `<cac:PayeeFinancialAccount>` is emitted.
+  if (input.paymentMeansCode || input.paymentIban) {
+    const paymentMeansElement = root
       .ele('cac:PaymentMeans')
       .ele('cbc:PaymentMeansCode')
-      .txt('31')
-      .up() // SEPA Credit transfer (UN/ECE 4461)
-      .ele('cac:PayeeFinancialAccount')
-      .ele('cbc:ID')
-      .txt(input.paymentIban)
-      .up()
-      .up()
+      .txt(input.paymentMeansCode ?? '31')
       .up();
+
+    if (input.paymentIban) {
+      paymentMeansElement.ele('cac:PayeeFinancialAccount').ele('cbc:ID').txt(input.paymentIban).up().up();
+    }
+
+    paymentMeansElement.up();
   }
 
   // Tax total with subtotals for each tax group
@@ -491,8 +498,26 @@ export function buildInvoiceXml(input: InvoiceInput): string {
       .up();
   }
 
-  // Legal monetary total
-  root
+  // Legal monetary total.
+  //
+  // CIUS-RO BR-CO-25: PayableAmount = TaxInclusiveAmount − PrepaidAmount.
+  // UBL 2.1 child ordering inside LegalMonetaryTotal:
+  //   LineExtensionAmount → TaxExclusiveAmount → TaxInclusiveAmount →
+  //   AllowanceTotalAmount → ChargeTotalAmount → PrepaidAmount →
+  //   PayableRoundingAmount → PayableAmount.
+  const prepaidAmount = input.prepaidAmount ?? 0;
+  if (prepaidAmount < 0) {
+    throw new AnafValidationError('Prepaid amount must be non-negative');
+  }
+  // Allow a 1-cent tolerance for floating-point rounding.
+  if (prepaidAmount > grandTotal + 0.01) {
+    throw new AnafValidationError(
+      `Prepaid amount (${prepaidAmount.toFixed(2)}) cannot exceed the invoice grand total (${grandTotal.toFixed(2)})`
+    );
+  }
+  const payableAmount = parseFloat((grandTotal - prepaidAmount).toFixed(2));
+
+  const legalMonetaryTotal = root
     .ele('cac:LegalMonetaryTotal')
     .ele('cbc:LineExtensionAmount', { currencyID: currency })
     .txt(totalTaxableAmount.toFixed(2))
@@ -502,11 +527,13 @@ export function buildInvoiceXml(input: InvoiceInput): string {
     .up()
     .ele('cbc:TaxInclusiveAmount', { currencyID: currency })
     .txt(grandTotal.toFixed(2))
-    .up()
-    .ele('cbc:PayableAmount', { currencyID: currency })
-    .txt(grandTotal.toFixed(2))
-    .up()
     .up();
+
+  if (prepaidAmount > 0) {
+    legalMonetaryTotal.ele('cbc:PrepaidAmount', { currencyID: currency }).txt(prepaidAmount.toFixed(2)).up();
+  }
+
+  legalMonetaryTotal.ele('cbc:PayableAmount', { currencyID: currency }).txt(payableAmount.toFixed(2)).up().up();
 
   // Invoice lines
   input.lines.forEach((line, index) => {

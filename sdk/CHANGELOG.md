@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-05-28
+
+### Added
+
+- **`InvoiceInput.paymentMeansCode`** — override the hardcoded `31` (SEPA credit
+  transfer) with any UN/ECE 4461 code (`10` cash, `48` bank card, `30` credit
+  transfer, etc.). Backwards compatible: when omitted and `paymentIban` is set,
+  defaults to `31` to preserve the old behaviour. When `paymentMeansCode` is set
+  without `paymentIban`, the `<cac:PaymentMeans>` block is still emitted but
+  with no `<cac:PayeeFinancialAccount>` — the right shape for cash and card
+  payments captured at a POS / kiosk.
+- **`InvoiceInput.prepaidAmount`** — emit `<cbc:PrepaidAmount>` inside
+  `<cac:LegalMonetaryTotal>` and auto-recompute `<cbc:PayableAmount>` as
+  `TaxInclusiveAmount − PrepaidAmount`, satisfying CIUS-RO rule BR-CO-25.
+  A fully-paid invoice (e.g. cash at kiosk) therefore renders with
+  `PayableAmount = 0.00`. Rejected at build time if `prepaidAmount > grandTotal`
+  (with a 1-cent rounding tolerance) or if it is negative.
+- Validated end-to-end against the live ANAF test-mode validator
+  (`EfacturaToolsClient.validateXml`) — a fully-prepaid cash invoice returns
+  `valid: true`.
+
 ## [1.2.0] - 2026-05-08
 
 ### Fixed

@@ -1207,6 +1207,174 @@ describe('UblBuilder Tests', () => {
     });
   });
 
+  describe('PaymentMeans + PrepaidAmount (cash/card payments)', () => {
+    /**
+     * The mockTestData fixture has a single line: quantity 1, unit price 100, tax 19% →
+     * line extension 100.00, tax 19.00, grand total 119.00. Reuse those numbers across
+     * the assertions below.
+     */
+    const GRAND_TOTAL = 119.0;
+
+    test('emits PaymentMeansCode 10 (cash) with no PayeeFinancialAccount when paid in cash', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        paymentMeansCode: '10',
+        prepaidAmount: GRAND_TOTAL,
+      };
+
+      const xml = builder.generateInvoiceXml(invoiceData);
+
+      expect(xml).toContain('<cac:PaymentMeans>');
+      expect(xml).toContain('<cbc:PaymentMeansCode>10</cbc:PaymentMeansCode>');
+      expect(xml).not.toContain('<cac:PayeeFinancialAccount>');
+      // Fully paid → PayableAmount = 0.00, PrepaidAmount = grand total.
+      expect(xml).toContain(`<cbc:PrepaidAmount currencyID="RON">${GRAND_TOTAL.toFixed(2)}</cbc:PrepaidAmount>`);
+      expect(xml).toContain('<cbc:PayableAmount currencyID="RON">0.00</cbc:PayableAmount>');
+    });
+
+    test('emits PaymentMeansCode 48 (card) with no PayeeFinancialAccount when paid by card', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        paymentMeansCode: '48',
+        prepaidAmount: GRAND_TOTAL,
+      };
+
+      const xml = builder.generateInvoiceXml(invoiceData);
+
+      expect(xml).toContain('<cbc:PaymentMeansCode>48</cbc:PaymentMeansCode>');
+      expect(xml).not.toContain('<cac:PayeeFinancialAccount>');
+      expect(xml).toContain('<cbc:PayableAmount currencyID="RON">0.00</cbc:PayableAmount>');
+    });
+
+    test('handles partial prepayment (PayableAmount = grandTotal − prepaidAmount)', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        lines: [
+          { description: 'Service', quantity: 1, unitPrice: 100, taxPercent: 0 },
+        ],
+        prepaidAmount: 50,
+      };
+
+      const xml = builder.generateInvoiceXml(invoiceData);
+
+      // Grand total 100, prepaid 50 → payable 50.
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">100.00</cbc:TaxInclusiveAmount>');
+      expect(xml).toContain('<cbc:PrepaidAmount currencyID="RON">50.00</cbc:PrepaidAmount>');
+      expect(xml).toContain('<cbc:PayableAmount currencyID="RON">50.00</cbc:PayableAmount>');
+    });
+
+    test('places PrepaidAmount immediately before PayableAmount inside LegalMonetaryTotal', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        paymentMeansCode: '10',
+        prepaidAmount: GRAND_TOTAL,
+      };
+
+      const xml = builder.generateInvoiceXml(invoiceData);
+
+      const start = xml.indexOf('<cac:LegalMonetaryTotal>');
+      const end = xml.indexOf('</cac:LegalMonetaryTotal>', start);
+      const section = xml.substring(start, end);
+
+      const prepaidIdx = section.indexOf('cbc:PrepaidAmount');
+      const payableIdx = section.indexOf('cbc:PayableAmount');
+      const taxInclusiveIdx = section.indexOf('cbc:TaxInclusiveAmount');
+
+      expect(prepaidIdx).toBeGreaterThan(taxInclusiveIdx);
+      expect(payableIdx).toBeGreaterThan(prepaidIdx);
+    });
+
+    test('emits PaymentMeans even when no IBAN is provided (cash-only invoice)', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        paymentMeansCode: '10',
+        // No paymentIban — but PaymentMeans should still appear because of the code.
+      };
+
+      const xml = builder.generateInvoiceXml(invoiceData);
+
+      expect(xml).toContain('<cac:PaymentMeans>');
+      expect(xml).toContain('<cbc:PaymentMeansCode>10</cbc:PaymentMeansCode>');
+      expect(xml).not.toContain('<cac:PayeeFinancialAccount>');
+    });
+
+    test('backwards compat: paymentIban alone still emits code 31 + IBAN and no PrepaidAmount', () => {
+      const iban = 'RO49AAAA1B31007593840000';
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        paymentIban: iban,
+      };
+
+      const xml = builder.generateInvoiceXml(invoiceData);
+
+      expect(xml).toContain('<cbc:PaymentMeansCode>31</cbc:PaymentMeansCode>');
+      expect(xml).toContain('<cac:PayeeFinancialAccount>');
+      expect(xml).toContain(`<cbc:ID>${iban}</cbc:ID>`);
+      // No prepayment → no PrepaidAmount, PayableAmount = grand total.
+      expect(xml).not.toContain('cbc:PrepaidAmount');
+      expect(xml).toContain(`<cbc:PayableAmount currencyID="RON">${GRAND_TOTAL.toFixed(2)}</cbc:PayableAmount>`);
+    });
+
+    test('emits PaymentMeansCode override (e.g. 30 credit transfer) together with IBAN when both are set', () => {
+      const iban = 'RO49AAAA1B31007593840000';
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        paymentMeansCode: '30',
+        paymentIban: iban,
+      };
+
+      const xml = builder.generateInvoiceXml(invoiceData);
+
+      expect(xml).toContain('<cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>');
+      expect(xml).toContain('<cac:PayeeFinancialAccount>');
+      expect(xml).toContain(`<cbc:ID>${iban}</cbc:ID>`);
+    });
+
+    test('throws AnafValidationError when prepaidAmount exceeds the grand total', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        lines: [{ description: 'Item', quantity: 1, unitPrice: 100, taxPercent: 0 }],
+        prepaidAmount: 200, // grand total is 100
+      };
+
+      // UblBuilder wraps the builder error in AnafValidationError — assert on
+      // the wrapping class + the inner message text.
+      expect(() => builder.generateInvoiceXml(invoiceData)).toThrow(/Prepaid amount/);
+    });
+
+    test('throws AnafValidationError when prepaidAmount is negative', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        prepaidAmount: -1,
+      };
+
+      expect(() => builder.generateInvoiceXml(invoiceData)).toThrow(/Prepaid amount/);
+    });
+
+    test('accepts prepaidAmount === grandTotal within rounding tolerance', () => {
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        // Force a non-trivial total by overriding the line. Line: 1 * 33.333 * 1.19 ≈ 39.66.
+        lines: [{ description: 'Service', quantity: 1, unitPrice: 33.33, taxPercent: 19 }],
+        prepaidAmount: 39.66,
+      };
+
+      const xml = builder.generateInvoiceXml(invoiceData);
+
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">39.66</cbc:TaxInclusiveAmount>');
+      expect(xml).toContain('<cbc:PrepaidAmount currencyID="RON">39.66</cbc:PrepaidAmount>');
+      expect(xml).toContain('<cbc:PayableAmount currencyID="RON">0.00</cbc:PayableAmount>');
+    });
+
+    test('default behaviour (no payment fields) is unchanged: no PaymentMeans, PayableAmount = grand total', () => {
+      const xml = builder.generateInvoiceXml(mockTestData.invoiceData);
+
+      expect(xml).not.toContain('cac:PaymentMeans');
+      expect(xml).not.toContain('cbc:PrepaidAmount');
+      expect(xml).toContain(`<cbc:PayableAmount currencyID="RON">${GRAND_TOTAL.toFixed(2)}</cbc:PayableAmount>`);
+    });
+  });
+
   describe('Performance Tests', () => {
     test('should generate XML quickly for simple invoices', () => {
       const start = Date.now();
