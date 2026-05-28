@@ -12,6 +12,10 @@ import { argv } from 'node:process';
 
 const outFlagIdx = argv.indexOf('--out');
 const outPath = outFlagIdx > -1 ? argv[outFlagIdx + 1] : undefined;
+if (outFlagIdx > -1 && (!outPath || outPath.startsWith('-'))) {
+  console.error('Missing value for --out. Usage: --out <path>');
+  process.exit(1);
+}
 
 const builder = new UblBuilder();
 

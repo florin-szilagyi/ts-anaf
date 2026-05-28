@@ -177,7 +177,8 @@ export class EfacturaToolsClient {
         },
       });
 
-      if (response.headers?.get('content-type')?.includes('application/json')) {
+      const contentType = response.headers?.get('content-type')?.toLowerCase() ?? '';
+      if (contentType.includes('application/json')) {
         const errorData = parseJsonResponse<{ Messages?: Array<{ message: string }> }>(response.data);
         throw new AnafApiError(
           errorData.Messages ? errorData.Messages.map((m) => m.message).join('\n') : 'PDF conversion failed'

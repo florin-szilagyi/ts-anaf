@@ -515,7 +515,9 @@ export function buildInvoiceXml(input: InvoiceInput): string {
       `Prepaid amount (${prepaidAmount.toFixed(2)}) cannot exceed the invoice grand total (${grandTotal.toFixed(2)})`
     );
   }
-  const payableAmount = parseFloat((grandTotal - prepaidAmount).toFixed(2));
+  // Clamp to 0 so the tolerance check above can't yield a negative PayableAmount
+  // (e.g. grandTotal=119.00, prepaidAmount=119.005 → -0.01 before clamping).
+  const payableAmount = Math.max(0, parseFloat((grandTotal - prepaidAmount).toFixed(2)));
 
   const legalMonetaryTotal = root
     .ele('cac:LegalMonetaryTotal')

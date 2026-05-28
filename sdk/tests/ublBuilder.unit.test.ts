@@ -1249,9 +1249,7 @@ describe('UblBuilder Tests', () => {
     test('handles partial prepayment (PayableAmount = grandTotal − prepaidAmount)', () => {
       const invoiceData: InvoiceInput = {
         ...mockTestData.invoiceData,
-        lines: [
-          { description: 'Service', quantity: 1, unitPrice: 100, taxPercent: 0 },
-        ],
+        lines: [{ description: 'Service', quantity: 1, unitPrice: 100, taxPercent: 0 }],
         prepaidAmount: 50,
       };
 
