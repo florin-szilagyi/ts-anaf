@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-16
+
+### Added
+
+- **`InvoiceInput.billingReference`** — an optional reference to a preceding
+  invoice (BG-3 / BT-25, BT-26), emitted as `cac:BillingReference` /
+  `cac:InvoiceDocumentReference` at its UBL 2.1 slot (after `cac:InvoicePeriod`,
+  before the parties). `cbc:IssueDate` (BT-26) is omitted when the referenced
+  invoice's issue date is not supplied.
+
+  ```typescript
+  // Storno (reversal) of invoice PA-2026-00042: a single −1 × 100 @ 19% line.
+  builder.generateInvoiceXml({
+    // ...
+    lines: [{ description: 'Storno servicii', quantity: -1, unitPrice: 100, taxPercent: 19 }],
+    billingReference: { invoiceId: 'PA-2026-00042', issueDate: '2026-05-10' },
+  });
+  ```
+
+- **Corrective ("storno") invoice support.** When a `billingReference` is
+  present the document is treated as corrective: negative line **quantities**
+  are allowed (so the line nets out as a reversal), the `cbc:PayableAmount`
+  zero-clamp is skipped (the total is legitimately negative), and the prepaid
+  upper-bound guard is bypassed. The item net price `cac:Price/cbc:PriceAmount`
+  stays non-negative (EN16931 BR-27) — the reversal sign lives on the quantity,
+  never on the price. The `cbc:InvoiceTypeCode` remains `'380'` (this is not a
+  credit note). A zero quantity is still rejected in every mode.
+
+  Normal (non-corrective) invoices — those without a `billingReference` — are
+  completely unchanged: the emitted XML, totals, and validation behaviour are
+  byte-identical to previous versions.
+
+### Fixed
+
+- **UBL-CR-480** — document-level `AllowanceCharge` entries no longer emit
+  `cbc:TaxExemptionReasonCode` inside their `cac:TaxCategory`, which ANAF rejects
+  via schematron rule `UBL-CR-480`. The exemption reason (BT-121) remains where
+  it is valid, on `cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory`. This affected
+  only allowances/charges resolving to an exempt-style category (`O` for non-VAT
+  suppliers, or an inherited `E`/`Z`/`AE` line group); standard-rated (`S`)
+  allowances were never affected, which is why the rejection hit ~1% of invoices.
+
 ## [1.3.2] - 2026-05-29
 
 ### Added

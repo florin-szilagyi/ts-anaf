@@ -1639,13 +1639,54 @@ describe('UblBuilder Tests', () => {
       expect(block).toContain('<cbc:ID>O</cbc:ID>');
       // BR-O-05: cbc:Percent must NOT appear for category O.
       expect(block).not.toContain('<cbc:Percent>');
-      expect(block).toContain('<cbc:TaxExemptionReasonCode>VATEX-EU-O</cbc:TaxExemptionReasonCode>');
+      // UBL-CR-480: the exemption reason must NOT appear inside the AllowanceCharge
+      // TaxCategory (it lives on the TaxSubtotal instead — covered by the dedicated
+      // UBL-CR-480 regression test below).
+      expect(block).not.toContain('<cbc:TaxExemptionReasonCode>');
 
       // Math: line 100 - allowance 30 = TaxExclusive 70, no tax, TaxInclusive 70.
       expect(xml).toContain('<cbc:LineExtensionAmount currencyID="RON">100.00</cbc:LineExtensionAmount>');
       expect(xml).toContain('<cbc:AllowanceTotalAmount currencyID="RON">30.00</cbc:AllowanceTotalAmount>');
       expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">70.00</cbc:TaxExclusiveAmount>');
       expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">70.00</cbc:TaxInclusiveAmount>');
+    });
+
+    test('UBL-CR-480: AllowanceCharge TaxCategory must NOT carry a TaxExemptionReasonCode, even for exempt categories', () => {
+      // Reproduces the ANAF rejection seen on the ~1% of invoices whose document-level
+      // allowance resolves to an exempt-style category (here 'O' via a non-VAT supplier).
+      // The exemption reason is legal on the TaxSubtotal/TaxCategory but FORBIDDEN on the
+      // AllowanceCharge/TaxCategory:
+      //   [UBL-CR-480] not(cac:AllowanceCharge/cac:TaxCategory/cbc:TaxExemptionReasonCode)
+      //   [UBL-CR-481] not(cac:AllowanceCharge/cac:TaxCategory/cbc:TaxExemptionReason)
+      const nonVatSupplier: Party = {
+        ...mockTestData.invoiceData.supplier,
+        vatNumber: undefined,
+      };
+
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        supplier: nonVatSupplier,
+        isSupplierVatPayer: false,
+        lines: [{ description: 'Service', quantity: 1, unitPrice: 100, taxPercent: 0 }],
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 30, reason: 'Discount' }],
+      });
+
+      const acStart = xml.indexOf('<cac:AllowanceCharge>');
+      const acEnd = xml.indexOf('</cac:AllowanceCharge>');
+      const acBlock = xml.substring(acStart, acEnd);
+
+      // The category id and TaxScheme are still required inside the AllowanceCharge...
+      expect(acBlock).toContain('<cbc:ID>O</cbc:ID>');
+      expect(acBlock).toContain('<cac:TaxScheme>');
+      // ...but the exemption reason must NOT appear there (UBL-CR-480 / UBL-CR-481).
+      expect(acBlock).not.toContain('TaxExemptionReasonCode');
+      expect(acBlock).not.toContain('TaxExemptionReason');
+
+      // It must still be emitted where it is legal: the document-level TaxSubtotal.
+      const taxSubtotalStart = xml.indexOf('<cac:TaxSubtotal>');
+      const taxSubtotalEnd = xml.indexOf('</cac:TaxSubtotal>') + '</cac:TaxSubtotal>'.length;
+      const taxSubtotal = xml.substring(taxSubtotalStart, taxSubtotalEnd);
+      expect(taxSubtotal).toContain('<cbc:TaxExemptionReasonCode>VATEX-EU-O</cbc:TaxExemptionReasonCode>');
     });
   });
 

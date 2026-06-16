@@ -220,9 +220,13 @@ function validateInvoiceInput(input: InvoiceInput): void {
     throw new AnafValidationError('Invoice lines array is required');
   }
 
+  // Negative line quantities are only allowed on corrective ("storno") invoices,
+  // which are identified by the presence of a billingReference.
+  const allowNegativeQuantity = !!input.billingReference;
+
   // Only validate individual lines if there are any
   if (input.lines.length > 0) {
-    input.lines.forEach((line, index) => validateLine(line, index));
+    input.lines.forEach((line, index) => validateLine(line, index, allowNegativeQuantity));
   }
 
   // Validate document-level allowances/charges (shape only — tax-category
@@ -276,16 +280,30 @@ function validateAddress(address: Address, role: string): void {
  * Validate invoice line
  * @param line Line to validate
  * @param index Line index for error messages
+ * @param allowNegativeQuantity When true (corrective/storno invoices, i.e. a
+ *   `billingReference` is present), negative quantities are permitted so the line
+ *   nets out as a reversal. A zero quantity is always rejected. Defaults to false,
+ *   so normal invoices keep their original "quantity must be positive" rule.
  */
-function validateLine(line: InvoiceLine, index: number): void {
+function validateLine(line: InvoiceLine, index: number, allowNegativeQuantity = false): void {
   if (!line.description?.trim()) {
     throw new AnafValidationError(`Line ${index + 1}: Description is required`);
   }
 
-  if (typeof line.quantity !== 'number' || line.quantity <= 0) {
+  if (typeof line.quantity !== 'number' || Number.isNaN(line.quantity)) {
+    throw new AnafValidationError(`Line ${index + 1}: Quantity must be a non-zero number`);
+  }
+  // A zero quantity is rejected regardless of mode.
+  if (line.quantity === 0) {
+    throw new AnafValidationError(`Line ${index + 1}: Quantity must be a non-zero number`);
+  }
+  // A negative quantity is only valid on corrective ("storno") invoices.
+  if (line.quantity < 0 && !allowNegativeQuantity) {
     throw new AnafValidationError(`Line ${index + 1}: Quantity must be a positive number`);
   }
 
+  // BR-27: the item net price (cbc:PriceAmount) must never be negative — on a
+  // corrective invoice the reversal sign lives on the quantity, not the price.
   if (typeof line.unitPrice !== 'number' || line.unitPrice < 0) {
     throw new AnafValidationError(`Line ${index + 1}: Unit price must be a non-negative number`);
   }
@@ -522,6 +540,11 @@ export function buildInvoiceXml(input: InvoiceInput): string {
   const currency = input.currency || DEFAULT_CURRENCY;
   const isSupplierVatPayer = input.isSupplierVatPayer ?? !!input.supplier.vatNumber;
 
+  // A corrective ("storno") invoice references a preceding invoice via
+  // billingReference. Its presence relaxes the negative-amount guards below;
+  // normal invoices (no billingReference) are completely unaffected.
+  const isCorrective = !!input.billingReference;
+
   // Format dates
   const issueDate = formatDateForAnaf(input.issueDate);
   const dueDate = input.dueDate ? formatDateForAnaf(input.dueDate) : issueDate;
@@ -558,7 +581,6 @@ export function buildInvoiceXml(input: InvoiceInput): string {
   // Apply allowances/charges to the per-category tax groups so cac:TaxSubtotal
   // reflects the post-adjustment base (BR-CO-17 / BR-DEC-19).
   const taxGroups = applyAllowancesToTaxGroups(lineTaxGroups, resolvedAllowances);
-  const totalTaxableAmount = parseFloat(taxGroups.reduce((sum, group) => sum + group.taxableAmount, 0).toFixed(2));
   const totalTaxAmount = parseFloat(taxGroups.reduce((sum, group) => sum + group.taxAmount, 0).toFixed(2));
   // BT-109 TaxExclusiveAmount = LineExtension − AllowanceTotal + ChargeTotal.
   // Equivalent to the post-adjustment sum of group taxable amounts; we compute it
@@ -611,6 +633,25 @@ export function buildInvoiceXml(input: InvoiceInput): string {
   if (input.invoicePeriodEndDate) {
     const periodEndDate = formatDateForAnaf(input.invoicePeriodEndDate);
     root.ele('cac:InvoicePeriod').ele('cbc:EndDate').txt(periodEndDate).up().up();
+  }
+
+  // Preceding invoice reference (BG-3 / BT-25, BT-26) — emitted for corrective
+  // ("storno") documents that adjust or reverse an earlier invoice. Per UBL 2.1
+  // ordering this slots after cac:InvoicePeriod and before the parties.
+  if (input.billingReference) {
+    const invoiceDocRef = root
+      .ele('cac:BillingReference')
+      .ele('cac:InvoiceDocumentReference')
+      .ele('cbc:ID')
+      .txt(input.billingReference.invoiceId)
+      .up();
+
+    // BT-26 is optional but recommended; omit the element entirely when absent.
+    if (input.billingReference.issueDate !== undefined) {
+      invoiceDocRef.ele('cbc:IssueDate').txt(formatDateForAnaf(input.billingReference.issueDate)).up();
+    }
+
+    invoiceDocRef.up().up();
   }
 
   // Parties
@@ -668,9 +709,11 @@ export function buildInvoiceXml(input: InvoiceInput): string {
       taxCategoryElement.ele('cbc:Percent').txt(resolved.percent.toFixed(2)).up();
     }
 
-    if (resolved.exemptionReasonCode) {
-      taxCategoryElement.ele('cbc:TaxExemptionReasonCode').txt(resolved.exemptionReasonCode).up();
-    }
+    // UBL-CR-480 / UBL-CR-481: the AllowanceCharge's TaxCategory must NOT carry a
+    // TaxExemptionReasonCode (or TaxExemptionReason). The exemption reason belongs
+    // only on the document-level TaxTotal/TaxSubtotal/TaxCategory (BT-121), which is
+    // emitted below from group.exemptionReasonCode. resolved.exemptionReasonCode is
+    // still consumed by applyAllowancesToTaxGroups to seed that TaxSubtotal.
 
     taxCategoryElement.ele('cac:TaxScheme').ele('cbc:ID').txt('VAT').up().up().up(); // close TaxCategory + AllowanceCharge
   });
@@ -759,14 +802,21 @@ export function buildInvoiceXml(input: InvoiceInput): string {
     throw new AnafValidationError('Prepaid amount must be non-negative');
   }
   // Allow a 1-cent tolerance for floating-point rounding.
-  if (prepaidAmount > grandTotal + 0.01) {
+  // Relaxation (corrective only): on a storno invoice the grand total is negative,
+  // so an upper-bound comparison against it is meaningless — skip it when a
+  // billingReference is present. Normal invoices keep the original guard.
+  if (!isCorrective && prepaidAmount > grandTotal + 0.01) {
     throw new AnafValidationError(
       `Prepaid amount (${prepaidAmount.toFixed(2)}) cannot exceed the invoice grand total (${grandTotal.toFixed(2)})`
     );
   }
-  // Clamp to 0 so the tolerance check above can't yield a negative PayableAmount
-  // (e.g. grandTotal=119.00, prepaidAmount=119.005 → -0.01 before clamping).
-  const payableAmount = Math.max(0, parseFloat((grandTotal - prepaidAmount).toFixed(2)));
+  // Normal invoices clamp to 0 so the tolerance check above can't yield a negative
+  // PayableAmount (e.g. grandTotal=119.00, prepaidAmount=119.005 → -0.01).
+  // Relaxation (corrective only): a storno invoice is legitimately negative, so do
+  // not clamp when a billingReference is present.
+  const payableAmount = isCorrective
+    ? parseFloat((grandTotal - prepaidAmount).toFixed(2))
+    : Math.max(0, parseFloat((grandTotal - prepaidAmount).toFixed(2)));
 
   // BT-106 LineExtensionAmount is the sum of line nets (unchanged by document-level
   // allowances/charges). BT-109 TaxExclusiveAmount differs from LineExtensionAmount

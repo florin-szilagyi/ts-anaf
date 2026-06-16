@@ -379,6 +379,21 @@ export interface DocumentAllowanceCharge {
 }
 
 /**
+ * Reference to a preceding (already-issued) invoice (BG-3).
+ *
+ * Emitted as `cac:BillingReference` / `cac:InvoiceDocumentReference`. Present on
+ * corrective ("storno") documents that adjust or reverse an earlier invoice. The
+ * mere presence of a `billingReference` on {@link InvoiceInput} switches the
+ * builder into corrective mode (negative line quantities allowed, etc.).
+ */
+export interface BillingReference {
+  /** BT-25 — identifier of the preceding (referenced) invoice. */
+  invoiceId: string;
+  /** BT-26 — issue date of the preceding invoice (optional but recommended). */
+  issueDate?: string | Date;
+}
+
+/**
  * Complete invoice data for UBL generation
  */
 export interface InvoiceInput {
@@ -441,6 +456,18 @@ export interface InvoiceInput {
    * @see DocumentAllowanceCharge
    */
   documentAllowanceCharges?: DocumentAllowanceCharge[];
+  /**
+   * Reference to a preceding invoice (BG-3 / BT-25, BT-26). When provided, the
+   * document is treated as a corrective ("storno") invoice: negative line
+   * quantities are allowed, the PayableAmount zero-clamp is skipped, and the
+   * prepaid upper-bound guard is bypassed. The InvoiceTypeCode stays '380'.
+   *
+   * Backwards compatible: when omitted, the emitted XML and validation behaviour
+   * are identical to previous versions.
+   *
+   * @see BillingReference
+   */
+  billingReference?: BillingReference;
 }
 
 /**
