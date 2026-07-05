@@ -163,6 +163,27 @@ export async function syncNow(companyId: string): Promise<ActionResult> {
   }
 }
 
+/** Queue an archive sync for every company that has an ANAF connection. */
+export async function syncAllNow(): Promise<ActionResult<{ queued: number }>> {
+  try {
+    const userId = await requireUser();
+    const rows = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(and(eq(companies.userId, userId), sql`${companies.grantId} is not null`));
+    if (rows.length === 0) {
+      return { ok: false, error: 'No companies connected to ANAF yet' };
+    }
+    await inngest.send(
+      rows.map((c) => ({ name: 'archive/company.sync' as const, data: { companyId: c.id, manual: true } }))
+    );
+    revalidatePath('/dashboard/archive');
+    return { ok: true, data: { queued: rows.length } };
+  } catch (cause) {
+    return toError(cause);
+  }
+}
+
 // ---------- API keys ----------
 
 export async function createKey(

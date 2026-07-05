@@ -71,7 +71,7 @@ export default async function CompaniesPage({
             </div>
             <dl className="mt-3 space-y-1 text-xs text-zinc-500">
               <div>VAT payer: {c.vatPayer ? 'yes' : 'no'}</div>
-              <div>Archive: {c.archiveEnabled ? 'weekly sync on' : 'off'}</div>
+              <div>Archive: {c.archiveEnabled ? 'daily sync on' : 'off'}</div>
               <div>Last sync: {c.lastSyncAt ? c.lastSyncAt.toISOString().slice(0, 16).replace('T', ' ') : 'never'}</div>
             </dl>
             <div className="mt-4">

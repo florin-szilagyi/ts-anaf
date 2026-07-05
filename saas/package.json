@@ -2,19 +2,20 @@
   "name": "@florinszilagyi/fastbill",
   "version": "0.1.0",
   "private": true,
-  "description": "fastbill — free e-Factura SaaS: dashboard, public API and archive on top of anaf-ts-sdk",
+  "description": "fastbill \u2014 free e-Factura SaaS: dashboard, public API and archive on top of anaf-ts-sdk",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint src tests --ext .ts,.tsx",
-    "lint:fix": "eslint src tests --ext .ts,.tsx --fix",
+    "lint": "eslint src tests e2e --ext .ts,.tsx",
+    "lint:fix": "eslint src tests e2e --ext .ts,.tsx --fix",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test"
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.700.0",
@@ -40,6 +41,8 @@
     "drizzle-kit": "^0.31.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.0"
+    "vitest": "^3.1.0",
+    "@playwright/test": "^1.52.0",
+    "@clerk/testing": "^1.4.0"
   }
 }

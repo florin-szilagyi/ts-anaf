@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { companies, syncRuns } from '@/db/schema';
+import { SyncAllButton } from '@/components/archive/SyncAllButton';
 
 export default async function ArchivePage() {
   const { userId } = await auth();
@@ -21,10 +22,14 @@ export default async function ArchivePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Archive</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Archive</h1>
+        <SyncAllButton />
+      </div>
       <p className="max-w-2xl text-sm text-zinc-600">
-        fastbill syncs every company weekly (ANAF only keeps messages ~60 days). Documents land in durable storage;
-        metadata is searchable under Invoices. Use “Sync now” on a company card for an immediate run.
+        fastbill syncs every company daily (ANAF only keeps messages ~60 days). Documents land in durable storage;
+        metadata is searchable under Invoices. “Refresh archive” queues an immediate sync for all companies; a company
+        card&apos;s “Sync now” does the same for one.
       </p>
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">

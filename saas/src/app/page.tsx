@@ -31,7 +31,7 @@ const FEATURES: Array<{ title: string; body: string }> = [
   },
   {
     title: 'Your permanent archive',
-    body: 'ANAF deletes messages after 60 days. fastbill syncs every company weekly, stores the signed documents durably and keeps searchable metadata forever.',
+    body: 'ANAF deletes messages after 60 days. fastbill syncs every company daily, stores the signed documents durably and keeps searchable metadata forever.',
   },
   {
     title: 'Free, with honest limits',

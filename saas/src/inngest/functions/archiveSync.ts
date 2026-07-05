@@ -9,14 +9,15 @@ import { putObject, storageKeys } from '@/lib/storage';
 import { inngest } from '../client';
 
 /**
- * Weekly archive sync. A cron fan-out emits one `archive/company.sync` event
+ * Daily archive sync. A cron fan-out emits one `archive/company.sync` event
  * per eligible company; the worker pages through ANAF messages for the window
  * since the last successful sync, downloads each new document ZIP into object
  * storage and upserts invoice metadata rows.
  *
  * ANAF keeps messages ~60 days, so the window is capped at 60 days back and
  * overlaps the previous run by 1 day; the (companyId, anafMessageId) unique
- * index makes re-ingestion idempotent.
+ * index makes re-ingestion idempotent. The dashboard's "Refresh archive"
+ * button fires the same per-company event on demand.
  */
 
 const MAX_WINDOW_MS = 60 * 24 * 60 * 60 * 1000; // ANAF retention: 60 days
@@ -25,7 +26,7 @@ const DOWNLOAD_BATCH = 10;
 
 export const archiveCron = inngest.createFunction(
   { id: 'archive-cron', retries: 2 },
-  { cron: '0 3 * * 1' }, // Mondays 03:00 UTC
+  { cron: '0 3 * * *' }, // daily 03:00 UTC
   async ({ step }) => {
     const eligible = await step.run('select-companies', async () => {
       const rows = await db
