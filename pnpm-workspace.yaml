@@ -2,3 +2,4 @@ packages:
   - 'sdk'
   - 'cli'
   - 'mcp'
+  - 'saas'

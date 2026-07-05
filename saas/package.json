@@ -1,0 +1,45 @@
+{
+  "name": "@florinszilagyi/fastbill",
+  "version": "0.1.0",
+  "private": true,
+  "description": "fastbill — free e-Factura SaaS: dashboard, public API and archive on top of anaf-ts-sdk",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint src tests --ext .ts,.tsx",
+    "lint:fix": "eslint src tests --ext .ts,.tsx --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@aws-sdk/s3-request-presigner": "^3.700.0",
+    "@clerk/nextjs": "^6.12.0",
+    "@florinszilagyi/anaf-ts-sdk": "workspace:*",
+    "@upstash/ratelimit": "^2.0.5",
+    "@upstash/redis": "^1.34.3",
+    "drizzle-orm": "^0.44.0",
+    "fflate": "^0.8.2",
+    "inngest": "^3.32.0",
+    "next": "^15.3.0",
+    "postgres": "^3.4.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "drizzle-kit": "^0.31.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.0"
+  }
+}

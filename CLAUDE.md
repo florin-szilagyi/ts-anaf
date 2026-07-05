@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository structure
 
-This is a pnpm workspace monorepo with two packages:
+This is a pnpm workspace monorepo:
 
 - **`sdk/`** — `anaf-ts-sdk`: TypeScript SDK for the Romanian ANAF e-Factura API (OAuth, document upload/download/validation, UBL invoice generation, company lookup).
 - **`cli/`** — `anaf-cli`: CLI wrapping the SDK. Supports imperative commands and YAML manifest mode for AI agents/CI.
+- **`mcp/`** — `anaf-mcp`: MCP server exposing the same services as tools.
+- **`saas/`** — `fastbill`: Next.js SaaS (dashboard + public REST API + archive) on top of the SDK. See `saas/README.md` for architecture, env and deploy notes. Key invariants: `src/lib/anaf/gateway.ts` is the only place SDK clients get built (static token shim), refresh-token rotation only happens inside the locked path in `src/lib/anaf/grantTokens.ts`, and all invoice status writes go through `src/lib/invoiceStatus.ts` (compare-and-set).
 
-Workspace root is private; both packages publish independently to npm.
+Workspace root is private; sdk/cli publish independently to npm; saas deploys to Vercel.
 
 ## Commands
 
