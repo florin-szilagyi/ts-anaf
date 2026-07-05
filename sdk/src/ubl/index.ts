@@ -7,6 +7,16 @@
 
 export { buildInvoiceXml, buildUblInvoiceXml } from './InvoiceBuilder';
 
+// Romanian (CIUS-RO) party-mapping helpers
+export {
+  COUNTY_NAME_TO_ISO,
+  countyFromAddress,
+  bucharestSectorFromAddress,
+  companyToParty,
+  mergePartyOverride,
+} from './roPartyMapping';
+export type { PartyOverride as RoPartyOverride } from './roPartyMapping';
+
 // Re-export types for convenience
 export type {
   InvoiceInput,
