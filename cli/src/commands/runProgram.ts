@@ -1,7 +1,7 @@
 import { CommanderError } from 'commander';
 import { buildProgram, type ServiceRegistry } from './buildProgram';
 import { CompanyService, ConfigStore, CredentialService, TokenStore, getXdgPaths } from '../state';
-import { LookupService, AuthService, EfacturaService, UblService } from '../services';
+import { LookupService, AuthService, EfacturaService, UblService, FastbillService } from '../services';
 import {
   CliError,
   EXIT_CODES,
@@ -110,6 +110,7 @@ export async function runProgram(options: RunProgramOptions): Promise<void> {
         options.services?.efacturaService ??
         new EfacturaService({ companyService, credentialService, configStore, tokenStore, lookupService }),
       ublService: options.services?.ublService ?? new UblService({ companyService, configStore, lookupService }),
+      fastbillService: options.services?.fastbillService ?? new FastbillService({ paths }),
     };
 
     const program = buildProgram({

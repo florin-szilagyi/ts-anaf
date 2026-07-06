@@ -16,6 +16,7 @@ export interface XdgPaths {
   appCacheDir: string;
   configFile: string;
   credentialFile: string;
+  fastbillCredentialFile: string;
   companiesDir: string;
   tokensDir: string;
   companyCacheDir: string;
@@ -52,6 +53,7 @@ export function getXdgPaths(roots?: XdgRoots): XdgPaths {
     appCacheDir,
     configFile: path.join(appConfigDir, 'config.yaml'),
     credentialFile: path.join(appConfigDir, 'credential.yaml'),
+    fastbillCredentialFile: path.join(appConfigDir, 'fastbill.json'),
     companiesDir,
     tokensDir,
     companyCacheDir,

@@ -8,11 +8,14 @@ export {
   companyFileSchema,
   cliConfigSchema,
   tokenRecordSchema,
+  fastbillConfigSchema,
   type CredentialFile,
   type CompanyFile,
+  type FastbillConfig,
 } from './schemas';
 
 export { ConfigStore } from './configStore';
 export { CredentialService } from './credentialService';
 export { CompanyService } from './companyService';
 export { TokenStore } from './tokenStore';
+export { FastbillStore } from './fastbillStore';

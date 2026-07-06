@@ -415,6 +415,42 @@ spec:
 | `INVALID_CUI` | `customerCui` doesn't match `(RO)?\d{2,10}` |
 | `INVALID_LINE` | Invoice line string doesn't have 4 or 5 segments |
 
+### `fastbill` -- Invoice through the fastbill API (no certificates)
+
+Drive [fastbill](https://fastbill.app) with an `sk_test_…`/`sk_live_…` API key instead of ANAF
+OAuth — ideal for CI and agents. Key resolution: `--api-key` flag → `FASTBILL_API_KEY` env →
+stored key (`fastbill auth set-key`, saved 0600). `--base-url`/`FASTBILL_BASE_URL` targets a
+non-default instance.
+
+| Command | Description |
+|---------|-------------|
+| `fastbill auth set-key --api-key <key> \| --stdin` | Store the API key |
+| `fastbill auth status` | Check connectivity, key mode and company count |
+| `fastbill auth clear` | Remove the stored key |
+| `fastbill companies` | List companies available to the key |
+| `fastbill invoices create --company-id <uuid> --number <n> --issue-date <d> --customer-cui <cui> --line "desc\|qty\|price\|tax" [--wait]` | Create an invoice (async 202; `--wait` polls to a terminal status) |
+| `fastbill invoices get <id>` | Fetch an invoice (the polling endpoint) |
+| `fastbill invoices wait <id> [--timeout <min>]` | Poll until validated/rejected/failed |
+| `fastbill invoices ls [--status --direction --from --to --limit --cursor]` | List invoices with cursor pagination |
+| `fastbill download <id> --kind xml\|zip\|pdf [--out <path>]` | Download invoice files |
+| `fastbill validate --company-id … --line …` | Build + ANAF-validate without creating (not quota-counted) |
+
+Manifest mode for agents/CI (`anaf-cli run -f job.yaml`, schema via `anaf-cli schema print FastbillInvoice`):
+
+```yaml
+apiVersion: anaf-cli/v1
+kind: FastbillInvoice
+spec:
+  companyId: 8f14e45f-…            # from `fastbill companies`
+  invoiceNumber: FB-0042
+  issueDate: "2026-07-01"
+  customerCui: RO12345678
+  lines:
+    - "Consulting|10|100|19"
+  idempotencyKey: job-2026-0042    # retries can never double-invoice
+  wait: true                       # poll until ANAF validates or rejects
+```
+
 ## Global flags
 
 | Flag | Description |
@@ -492,6 +528,8 @@ anaf-cli auth ls --format yaml | yq '.data.companies[].cui'
 | Variable | Description |
 |----------|-------------|
 | `ANAF_CLIENT_SECRET` | OAuth client secret (fallback when not stored in credential) |
+| `FASTBILL_API_KEY` | fastbill API key for the `fastbill` command group |
+| `FASTBILL_BASE_URL` | fastbill API origin override (default `https://fastbill.app`) |
 | `XDG_CONFIG_HOME` | Override config dir (default: `~/.config`) |
 | `XDG_DATA_HOME` | Override data dir (default: `~/.local/share`) |
 
@@ -501,6 +539,7 @@ anaf-cli auth ls --format yaml | yq '.data.companies[].cui'
 ~/.config/anaf-cli/
   config.yaml              # active company CUI + default environment
   credential.yaml          # OAuth app credential (clientId, redirectUri, optional secret)
+  fastbill.json            # fastbill API key (chmod 0600)
   companies/
     12345678.yaml          # company name + CUI, looked up from ANAF at login time
     87654321.yaml

@@ -6,6 +6,7 @@ export type {
   InvoiceOverrides,
   UblBuildAction,
   EfacturaUploadAction,
+  FastbillInvoiceAction,
 } from './types';
 
 export { parseInvoiceLine, parseInvoiceLines } from './lineParser';
@@ -16,3 +17,8 @@ export {
   efacturaUploadInputSchema,
   type EfacturaUploadInput,
 } from './efacturaUploadAction';
+export {
+  normalizeFastbillInvoiceAction,
+  fastbillInvoiceInputSchema,
+  type FastbillInvoiceInput,
+} from './fastbillInvoiceAction';

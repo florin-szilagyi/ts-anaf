@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { CLI_NAME, CLI_VERSION } from '../version';
 import type { OutputContext } from '../output';
 import type { CompanyService, CredentialService, ConfigStore, TokenStore, XdgPaths } from '../state';
-import type { LookupService, AuthService, EfacturaService, UblService } from '../services';
+import type { LookupService, AuthService, EfacturaService, UblService, FastbillService } from '../services';
 import { attachGlobalFlags } from './flags';
 import { registerAuth } from './groups/auth';
 import { registerCred } from './groups/cred';
@@ -11,6 +11,7 @@ import { registerLookup } from './groups/lookup';
 import { registerUbl } from './groups/ubl';
 import { registerRun } from './groups/run';
 import { registerSchema } from './groups/schema';
+import { registerFastbill } from './groups/fastbill';
 
 export interface ServiceRegistry {
   companyService: CompanyService;
@@ -21,6 +22,7 @@ export interface ServiceRegistry {
   authService: AuthService;
   efacturaService: EfacturaService;
   ublService: UblService;
+  fastbillService: FastbillService;
 }
 
 export interface CommandDeps {
@@ -43,6 +45,7 @@ export function buildProgram(deps: CommandDeps): Command {
   registerEfactura(program, deps);
   registerLookup(program, deps);
   registerUbl(program, deps);
+  registerFastbill(program, deps);
   registerRun(program, deps);
   registerSchema(program, deps);
 

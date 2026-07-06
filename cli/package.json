@@ -54,7 +54,7 @@
     "test:smoke": "jest --testPathPattern=smoke --runInBand",
     "verify": "pnpm run lint && pnpm run build && pnpm run test",
     "gen-docs": "tsx scripts/gen-docs.ts",
-    "gen-docs:check": "tsx scripts/gen-docs.ts --out COMMANDS.md.tmp && diff COMMANDS.md COMMANDS.md.tmp && rm COMMANDS.md.tmp || (rm -f COMMANDS.md.tmp && echo 'COMMANDS.md is stale — run: pnpm gen-docs' && exit 1)"
+    "gen-docs:check": "tsx scripts/gen-docs.ts --out COMMANDS.md.tmp && diff COMMANDS.md COMMANDS.md.tmp && rm COMMANDS.md.tmp || (rm -f COMMANDS.md.tmp && echo 'COMMANDS.md is stale \u2014 run: pnpm gen-docs' && exit 1)"
   },
   "dependencies": {
     "commander": "^12.1.0",
@@ -70,6 +70,7 @@
     "rimraf": "^6.0.1",
     "ts-jest": "^29.1.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@florinszilagyi/fastbill-sdk": "workspace:*"
   }
 }
