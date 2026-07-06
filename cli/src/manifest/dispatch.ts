@@ -1,15 +1,18 @@
 import {
   normalizeEfacturaUploadAction,
+  normalizeFastbillInvoiceAction,
   normalizeUblBuildAction,
   type EfacturaUploadAction,
   type EfacturaUploadInput,
+  type FastbillInvoiceAction,
+  type FastbillInvoiceInput,
   type UblBuildAction,
   type UblBuildInput,
 } from '../actions';
 import { CliError } from '../output/errors';
 import type { ManifestDocument } from './types';
 
-export type NormalizedAction = UblBuildAction | EfacturaUploadAction;
+export type NormalizedAction = UblBuildAction | EfacturaUploadAction | FastbillInvoiceAction;
 
 /**
  * Convert a validated manifest document into a normalized action. The
@@ -50,6 +53,10 @@ export function normalizeManifest(doc: ManifestDocument): NormalizedAction {
       output: doc.output ?? (spec.output as EfacturaUploadInput['output'] | undefined),
     };
     return normalizeEfacturaUploadAction(input);
+  }
+  if (doc.kind === 'FastbillInvoice') {
+    // No context concept — the supplier is identified by spec.companyId.
+    return normalizeFastbillInvoiceAction(doc.spec as FastbillInvoiceInput);
   }
   // `kind` is a string literal union, but the caller may pass a stale value
   // if the schema evolves — throw a CliError so the CLI surfaces a proper

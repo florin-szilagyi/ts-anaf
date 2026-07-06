@@ -99,6 +99,21 @@ export default function DocsPage() {
         ))}
       </section>
 
+      <section className="mt-10 space-y-3 text-sm leading-relaxed text-zinc-700">
+        <h2 className="text-xl font-semibold text-zinc-900">SDK & CLI</h2>
+        <p>
+          Skip hand-rolled HTTP: <code className="rounded bg-zinc-100 px-1">npm i @florinszilagyi/fastbill-sdk</code>{' '}
+          gives you a typed client (auto-idempotency keys, retries with Retry-After, `waitForInvoice` polling, cursor
+          iterators) whose zod schemas are the exact contract this API validates against. For terminals, CI and agents,{' '}
+          <code className="rounded bg-zinc-100 px-1">anaf-cli fastbill</code> wraps the same client —{' '}
+          <code className="rounded bg-zinc-100 px-1">
+            anaf-cli fastbill invoices create --line &quot;Consulting|10|100|19&quot; … --wait
+          </code>{' '}
+          or a declarative <code className="rounded bg-zinc-100 px-1">kind: FastbillInvoice</code> YAML manifest via{' '}
+          <code className="rounded bg-zinc-100 px-1">anaf-cli run -f job.yaml</code>.
+        </p>
+      </section>
+
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Create-invoice payload</h2>
         <pre className="mt-4 overflow-x-auto rounded-2xl bg-zinc-900 p-5 text-xs leading-relaxed text-zinc-100">

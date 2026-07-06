@@ -28,3 +28,9 @@ export {
   type EfacturaToolsClientLike,
 } from './efacturaService';
 export { UblService, type UblServiceOptions, type UblBuildResult } from './ublService';
+export {
+  FastbillService,
+  type FastbillServiceOptions,
+  type FastbillCallOptions,
+  type FastbillClientLike,
+} from './fastbillService';

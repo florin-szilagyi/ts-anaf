@@ -13,7 +13,7 @@
  * `anaf-cli/v1`. This file never removes fields — it only adds them.
  */
 
-export type ManifestKind = 'UblBuild' | 'EFacturaUpload';
+export type ManifestKind = 'UblBuild' | 'EFacturaUpload' | 'FastbillInvoice';
 
 export interface ManifestOutputTarget {
   mode?: 'stdout' | 'file';

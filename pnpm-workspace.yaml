@@ -3,3 +3,4 @@ packages:
   - 'cli'
   - 'mcp'
   - 'saas'
+  - 'fastbill-sdk'

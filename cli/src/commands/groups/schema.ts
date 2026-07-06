@@ -13,10 +13,10 @@ import type { ManifestKind } from '../../manifest';
  * (same pattern as `ubl build` writing raw XML).
  */
 export async function schemaPrint(deps: CommandDeps, kindArg: string): Promise<void> {
-  if (kindArg !== 'UblBuild' && kindArg !== 'EFacturaUpload') {
+  if (kindArg !== 'UblBuild' && kindArg !== 'EFacturaUpload' && kindArg !== 'FastbillInvoice') {
     throw new CliError({
       code: 'UNKNOWN_MANIFEST_KIND',
-      message: `schema print: unknown kind "${kindArg}" — expected UblBuild or EFacturaUpload`,
+      message: `schema print: unknown kind "${kindArg}" — expected UblBuild, EFacturaUpload or FastbillInvoice`,
       category: 'user_input',
       details: { kind: kindArg },
     });
@@ -34,6 +34,6 @@ export function registerSchema(parent: Command, deps: CommandDeps): void {
 
   schema
     .command('print <kind>')
-    .description('Print the JSON schema for a manifest kind (UblBuild | EFacturaUpload)')
+    .description('Print the JSON schema for a manifest kind (UblBuild | EFacturaUpload | FastbillInvoice)')
     .action((kindArg: string) => schemaPrint(deps, kindArg));
 }

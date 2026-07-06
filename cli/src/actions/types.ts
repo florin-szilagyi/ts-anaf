@@ -1,4 +1,4 @@
-export type ActionKind = 'ubl.build' | 'efactura.upload';
+export type ActionKind = 'ubl.build' | 'efactura.upload' | 'fastbill.invoice';
 
 export interface OutputTarget {
   mode: 'stdout' | 'file';
@@ -75,4 +75,27 @@ export interface EfacturaUploadAction {
     isExecutare?: boolean;
   };
   output: OutputTarget;
+}
+
+export interface FastbillInvoiceAction {
+  kind: 'fastbill.invoice';
+  invoice: {
+    companyId: string;
+    invoiceNumber: string;
+    /** YYYY-MM-DD */
+    issueDate: string;
+    /** YYYY-MM-DD */
+    dueDate?: string;
+    customerCui: string;
+    lines: InvoiceLineAction[];
+    currency?: string;
+    taxCurrencyTaxAmount?: number;
+    note?: string;
+    paymentIban?: string;
+  };
+  idempotencyKey?: string;
+  /** Poll until the invoice reaches a terminal ANAF status. */
+  wait?: boolean;
+  /** Wait budget in minutes (default 30). */
+  timeoutMinutes?: number;
 }

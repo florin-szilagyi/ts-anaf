@@ -4,7 +4,8 @@ import type { CommandDeps } from '../buildProgram';
 import { CliError } from '../../output/errors';
 import { renderSuccess } from '../../output';
 import { normalizeManifest, parseManifestFile } from '../../manifest';
-import type { EfacturaUploadAction, UblBuildAction } from '../../actions';
+import type { EfacturaUploadAction, FastbillInvoiceAction, UblBuildAction } from '../../actions';
+import { actionToCreateInput } from './fastbill';
 
 export interface RunCmdOpts {
   file?: string;
@@ -46,8 +47,32 @@ export async function runCommand(deps: CommandDeps, opts: RunCmdOpts): Promise<v
     await executeUblBuild(deps, action);
     return;
   }
+  if (action.kind === 'fastbill.invoice') {
+    await executeFastbillInvoice(deps, action);
+    return;
+  }
 
   await executeEfacturaUpload(deps, action);
+}
+
+async function executeFastbillInvoice(deps: CommandDeps, action: FastbillInvoiceAction): Promise<void> {
+  const service = deps.services.fastbillService;
+  const created = await service.call({}, (client) =>
+    client.createInvoice(actionToCreateInput(action), { idempotencyKey: action.idempotencyKey })
+  );
+
+  if (!action.wait) {
+    renderSuccess(deps.output, created, (d) => `invoice ${d.id} ${d.status}${d.replayed ? ' (replayed)' : ''}`);
+    return;
+  }
+
+  const invoice = await service.call({}, (client) =>
+    client.waitForInvoice(created.id, {
+      timeoutMs: action.timeoutMinutes ? action.timeoutMinutes * 60_000 : undefined,
+      onPoll: (i) => deps.output.streams.stderr.write(`status: ${i.status}\n`),
+    })
+  );
+  renderSuccess(deps.output, invoice, (d) => `invoice ${d.id} ${d.status}`);
 }
 
 async function executeUblBuild(deps: CommandDeps, action: UblBuildAction): Promise<void> {

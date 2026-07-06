@@ -31,7 +31,8 @@
     "postgres": "^3.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@florinszilagyi/fastbill-sdk": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",

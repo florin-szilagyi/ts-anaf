@@ -18,8 +18,10 @@
     "dev": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build && pnpm --filter @florinszilagyi/anaf-cli run dev",
     "dev:mcp": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build && pnpm --filter @florinszilagyi/anaf-mcp run dev",
     "dev:saas": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build && pnpm --filter @florinszilagyi/fastbill run dev",
-    "build:saas": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build && pnpm --filter @florinszilagyi/fastbill run build",
-    "test:saas": "pnpm --filter @florinszilagyi/fastbill run test"
+    "build:saas": "pnpm --filter @florinszilagyi/anaf-ts-sdk run build && pnpm --filter @florinszilagyi/fastbill-sdk run build && pnpm --filter @florinszilagyi/fastbill run build",
+    "test:saas": "pnpm --filter @florinszilagyi/fastbill run test",
+    "build:fastbill-sdk": "pnpm --filter @florinszilagyi/fastbill-sdk run build",
+    "test:fastbill-sdk": "pnpm --filter @florinszilagyi/fastbill-sdk run test"
   },
   "engines": {
     "node": ">=20"

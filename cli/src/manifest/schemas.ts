@@ -15,7 +15,7 @@ import type { ManifestDocument, ManifestKind } from './types';
 export const manifestDocumentSchema: z.ZodType<ManifestDocument> = z
   .object({
     apiVersion: z.literal('anaf-cli/v1'),
-    kind: z.enum(['UblBuild', 'EFacturaUpload']),
+    kind: z.enum(['UblBuild', 'EFacturaUpload', 'FastbillInvoice']),
     context: z.string().min(1).optional(),
     spec: z.record(z.unknown()),
     output: z
@@ -37,8 +37,77 @@ export const manifestDocumentSchema: z.ZodType<ManifestDocument> = z
  * caller can pipe it straight into a file or into a schema validator.
  */
 export function printJsonSchemaForKind(kind: ManifestKind): string {
-  const schema = kind === 'UblBuild' ? ublBuildManifestJsonSchema() : efacturaUploadManifestJsonSchema();
+  const schema =
+    kind === 'UblBuild'
+      ? ublBuildManifestJsonSchema()
+      : kind === 'FastbillInvoice'
+        ? fastbillInvoiceManifestJsonSchema()
+        : efacturaUploadManifestJsonSchema();
   return JSON.stringify(schema, null, 2);
+}
+
+function fastbillInvoiceManifestJsonSchema(): Record<string, unknown> {
+  return {
+    $schema: 'http://json-schema.org/draft-07/schema#',
+    $id: 'https://anaf-cli/manifest/FastbillInvoice.json',
+    title: 'FastbillInvoice manifest',
+    description:
+      'Manifest for `anaf-cli run` that creates an invoice through the fastbill API (async; requires FASTBILL_API_KEY or a stored key).',
+    type: 'object',
+    required: ['apiVersion', 'kind', 'spec'],
+    additionalProperties: false,
+    properties: {
+      apiVersion: { const: 'anaf-cli/v1' },
+      kind: { const: 'FastbillInvoice' },
+      spec: {
+        type: 'object',
+        required: ['companyId', 'invoiceNumber', 'issueDate', 'customerCui', 'lines'],
+        additionalProperties: false,
+        properties: {
+          companyId: {
+            type: 'string',
+            description: 'fastbill company uuid (supplier) — list with `anaf-cli fastbill companies`.',
+          },
+          invoiceNumber: { type: 'string', minLength: 1 },
+          issueDate: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          dueDate: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          customerCui: { type: 'string', pattern: '^(RO)?\\d{2,10}$' },
+          lines: {
+            type: 'array',
+            minItems: 1,
+            items: {
+              oneOf: [
+                {
+                  type: 'string',
+                  minLength: 1,
+                  description: 'Shorthand line: "description|quantity|unitPrice|taxPercent[|unitCode]"',
+                },
+                {
+                  type: 'object',
+                  required: ['description', 'quantity', 'unitPrice'],
+                  additionalProperties: false,
+                  properties: {
+                    description: { type: 'string', minLength: 1 },
+                    quantity: { type: 'number', exclusiveMinimum: 0 },
+                    unitPrice: { type: 'number', minimum: 0 },
+                    taxPercent: { type: 'number', minimum: 0, maximum: 100 },
+                    unitCode: { type: 'string', minLength: 1 },
+                  },
+                },
+              ],
+            },
+          },
+          currency: { type: 'string', minLength: 3, maxLength: 3 },
+          taxCurrencyTaxAmount: { type: 'number', minimum: 0 },
+          note: { type: 'string', minLength: 1 },
+          paymentIban: { type: 'string', minLength: 1 },
+          idempotencyKey: { type: 'string', minLength: 1 },
+          wait: { type: 'boolean', description: 'Poll until ANAF validates or rejects the invoice.' },
+          timeoutMinutes: { type: 'number', exclusiveMinimum: 0 },
+        },
+      },
+    },
+  };
 }
 
 function ublBuildManifestJsonSchema(): Record<string, unknown> {

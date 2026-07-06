@@ -7,10 +7,10 @@ function deps() {
 }
 
 describe('buildProgram', () => {
-  it('registers all 7 top-level groups in design order', () => {
+  it('registers all 8 top-level groups in design order', () => {
     const program = buildProgram(deps());
     const names = program.commands.map((c) => c.name());
-    expect(names).toEqual(['auth', 'cred', 'efactura', 'lookup', 'ubl', 'run', 'schema']);
+    expect(names).toEqual(['auth', 'cred', 'efactura', 'lookup', 'ubl', 'fastbill', 'run', 'schema']);
   });
 
   it('attaches global flags --format, --verbose, --no-color', () => {

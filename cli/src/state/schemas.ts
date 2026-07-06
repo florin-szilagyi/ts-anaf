@@ -46,3 +46,12 @@ export const tokenRecordSchema = z
     obtainedAt: z.string().optional(),
   })
   .strict();
+
+export const fastbillConfigSchema = z
+  .object({
+    apiKey: z.string().regex(/^sk_(test|live)_/, 'apiKey must be a fastbill secret key (sk_test_… or sk_live_…)'),
+    baseUrl: z.string().url().optional(),
+  })
+  .strict();
+
+export type FastbillConfig = z.infer<typeof fastbillConfigSchema>;

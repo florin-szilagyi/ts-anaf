@@ -9,9 +9,10 @@ This is a pnpm workspace monorepo:
 - **`sdk/`** — `anaf-ts-sdk`: TypeScript SDK for the Romanian ANAF e-Factura API (OAuth, document upload/download/validation, UBL invoice generation, company lookup).
 - **`cli/`** — `anaf-cli`: CLI wrapping the SDK. Supports imperative commands and YAML manifest mode for AI agents/CI.
 - **`mcp/`** — `anaf-mcp`: MCP server exposing the same services as tools.
+- **`fastbill-sdk/`** — `fastbill-sdk`: typed client for the fastbill REST API and the canonical API contract — `saas` imports its zod schemas, so change request/response shapes HERE, not in saas.
 - **`saas/`** — `fastbill`: Next.js SaaS (dashboard + public REST API + archive) on top of the SDK. See `saas/README.md` for architecture, env and deploy notes. Key invariants: `src/lib/anaf/gateway.ts` is the only place SDK clients get built (static token shim), refresh-token rotation only happens inside the locked path in `src/lib/anaf/grantTokens.ts`, and all invoice status writes go through `src/lib/invoiceStatus.ts` (compare-and-set).
 
-Workspace root is private; sdk/cli publish independently to npm; saas deploys to Vercel.
+Workspace root is private; sdk/cli/fastbill-sdk publish independently to npm; saas deploys to Vercel. The CLI's `fastbill` command group and the saas e2e `cli-smoke.spec.ts` both consume fastbill-sdk.
 
 ## Commands
 
@@ -22,7 +23,7 @@ pnpm install                   # install all deps (workspace-linked)
 pnpm run build:sdk             # build SDK (CJS + ESM + types)
 pnpm run build:cli             # build SDK then CLI (tsc + esbuild bundle)
 pnpm run test:sdk              # SDK unit tests
-pnpm run test:cli              # CLI tests (341 tests)
+pnpm run test:cli              # CLI tests (390 tests)
 pnpm run lint                  # lint both packages
 pnpm run lint:fix              # auto-fix lint in both
 pnpm run verify                # full CI gate: build SDK → verify CLI (lint+build+test)
@@ -45,7 +46,7 @@ lint:check     # eslint without fixing
 build          # clean + tsc + esbuild bundle (dist/bin/anaf-cli.cjs)
 build:bundle   # esbuild only (requires tsc output)
 build:sea      # Node SEA binary (requires build first)
-test           # jest (all 341 tests)
+test           # jest (all 390 tests)
 test:smoke     # spawns the built binary, checks --version/--help
 dev            # tsx src/bin/anaf-cli.ts (pass CLI args after --)
 verify         # lint + build + test (single CI gate)
@@ -81,10 +82,10 @@ commands/  ──┐                    ┌── state/     (XDG-path contexts,
 manifest/  ──┘                    └── output/    (text/JSON renderers, exit codes)
 ```
 
-- **`commands/`** — commander-based CLI parser. Each group (`auth`, `ctx`, `efactura`, `lookup`, `ubl`, `run`, `schema`) is a file under `commands/groups/`. `runProgram.ts` is the orchestrator (builds services, handles errors, maps exit codes).
+- **`commands/`** — commander-based CLI parser. Each group (`auth`, `cred`, `efactura`, `lookup`, `ubl`, `fastbill`, `run`, `schema`) is a file under `commands/groups/`. `runProgram.ts` is the orchestrator (builds services, handles errors, maps exit codes).
 - **`actions/`** — shared action types (`UblBuildAction`, `EfacturaUploadAction`), line parser (`"desc|qty|price|tax"`), override merge, zod normalizers. Consumed by both commands and manifest parser.
-- **`manifest/`** — YAML/JSON parser for `anaf-cli run -f job.yaml`. Dispatches by `apiVersion: anaf-cli/v1` + `kind: UblBuild|EFacturaUpload` onto the same normalizers.
-- **`services/`** — `AuthService`, `LookupService` (with file cache), `UblService`, `EfacturaService`. Each wraps SDK clients and handles token persistence/rotation.
+- **`manifest/`** — YAML/JSON parser for `anaf-cli run -f job.yaml`. Dispatches by `apiVersion: anaf-cli/v1` + `kind: UblBuild|EFacturaUpload|FastbillInvoice` onto the same normalizers.
+- **`services/`** — `AuthService`, `LookupService` (with file cache), `UblService`, `EfacturaService`, `FastbillService` (fastbill API via fastbill-sdk). Each wraps SDK clients and handles token/key persistence.
 - **`state/`** — `ContextService`, `ConfigStore`, `TokenStore`. On-disk YAML/JSON at XDG paths. Zod-validated on read. Token files chmod 0600.
 - **`output/`** — `CliError` with category→exit-code mapping, text + JSON renderers, `writeBinary` for PDF/ZIP. Error code registry at `output/errorCodes.ts`.
 
