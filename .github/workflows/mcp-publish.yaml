@@ -39,9 +39,11 @@ jobs:
           version: 10
           run_install: false
 
+      # Node >= 22.14 so the bundled npm CLI is >= 11.5.1 — the minimum for
+      # npm Trusted Publishing (OIDC); pnpm publish delegates to the npm in PATH.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - name: Install workspace deps
