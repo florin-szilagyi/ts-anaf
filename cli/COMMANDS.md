@@ -501,6 +501,9 @@ Options:
   --line <line>                       invoice line:
                                       "desc|qty|unitPrice|taxPct[|unitCode]"
                                       (default: [])
+  --invoice-type-code <code>          invoice type code (BT-3): 380 commercial
+                                      (default), 384 corrective, 389
+                                      self-billed, 751 accounting
   --currency <code>                   currency code
   --tax-currency-tax-amount <amount>  total VAT in RON (required when
                                       --currency is not RON, CIUS-RO BR-53)
