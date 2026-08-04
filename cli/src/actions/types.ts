@@ -1,3 +1,5 @@
+import type { InvoiceTypeCode } from '@florinszilagyi/anaf-ts-sdk';
+
 export type ActionKind = 'ubl.build' | 'efactura.upload';
 
 export interface OutputTarget {
@@ -51,6 +53,11 @@ export interface UblBuildAction {
     dueDate?: string;
     customerCui: string;
     lines: InvoiceLineAction[];
+    /**
+     * Invoice type code (BT-3), CIUS-RO subset of UNTDID 1001:
+     * 380 commercial (default), 384 corrective, 389 self-billed, 751 accounting.
+     */
+    invoiceTypeCode?: InvoiceTypeCode;
     /** Defaults to RON downstream. */
     currency?: string;
     /**

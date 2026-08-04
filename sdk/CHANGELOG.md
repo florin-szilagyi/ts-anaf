@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-08-04
+
+### Added
+
+- **`InvoiceInput.invoiceTypeCode`** — optional invoice type code (BT-3),
+  emitted as `cbc:InvoiceTypeCode`. Accepts the CIUS-RO subset of UNTDID 1001:
+  `'380'` (commercial invoice), `'384'` (corrective invoice), `'389'`
+  (self-billed invoice), `'751'` (invoice information for accounting purposes).
+  Any other value is rejected locally with an `AnafValidationError` naming the
+  allowed codes — instead of an opaque schematron rejection from ANAF after
+  upload.
+
+  ```typescript
+  builder.generateInvoiceXml({
+    // ...
+    invoiceTypeCode: '751', // omit for the default '380'
+  });
+  ```
+
+  Backwards compatible: when omitted, the type code defaults to `'380'` and the
+  emitted XML is byte-identical to previous versions.
+
 ## [1.4.0] - 2026-06-16
 
 ### Added

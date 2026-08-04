@@ -394,6 +394,15 @@ export interface BillingReference {
 }
 
 /**
+ * Invoice type code (BT-3) — the UNTDID 1001 subset accepted by CIUS-RO:
+ *  - `'380'` Commercial invoice (default)
+ *  - `'384'` Corrective invoice
+ *  - `'389'` Self-billed invoice
+ *  - `'751'` Invoice information for accounting purposes
+ */
+export type InvoiceTypeCode = '380' | '384' | '389' | '751';
+
+/**
  * Complete invoice data for UBL generation
  */
 export interface InvoiceInput {
@@ -403,6 +412,17 @@ export interface InvoiceInput {
   issueDate: string | Date;
   /** Due date (optional, defaults to issue date) */
   dueDate?: string | Date;
+  /**
+   * Invoice type code (BT-3), emitted as `cbc:InvoiceTypeCode`. Must be one of
+   * the CIUS-RO accepted codes: '380' (commercial invoice), '384' (corrective
+   * invoice), '389' (self-billed invoice), '751' (invoice information for
+   * accounting purposes). Any other value is rejected locally with an
+   * {@link AnafValidationError} instead of an opaque schematron rejection at ANAF.
+   *
+   * Backwards compatible: when omitted, defaults to '380' and the emitted XML is
+   * identical to previous versions.
+   */
+  invoiceTypeCode?: InvoiceTypeCode;
   /** Currency code (default: 'RON') */
   currency?: string;
   /** Invoice note / description */
@@ -460,7 +480,9 @@ export interface InvoiceInput {
    * Reference to a preceding invoice (BG-3 / BT-25, BT-26). When provided, the
    * document is treated as a corrective ("storno") invoice: negative line
    * quantities are allowed, the PayableAmount zero-clamp is skipped, and the
-   * prepaid upper-bound guard is bypassed. The InvoiceTypeCode stays '380'.
+   * prepaid upper-bound guard is bypassed. The InvoiceTypeCode still defaults
+   * to '380' — set {@link InvoiceInput.invoiceTypeCode} to '384' if the
+   * document should be typed as a corrective invoice.
    *
    * Backwards compatible: when omitted, the emitted XML and validation behaviour
    * are identical to previous versions.

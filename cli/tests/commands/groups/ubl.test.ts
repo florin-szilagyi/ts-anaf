@@ -132,6 +132,21 @@ describe('ublBuild', () => {
     expect(h.ublService.lastAction?.context).toBe('99999999');
   });
 
+  it('forwards --invoice-type-code to the action', async () => {
+    const h = harness();
+    await ublBuild(
+      { output: h.text, services: h.services, paths: getXdgPaths() },
+      {
+        invoiceNumber: 'FCT-384',
+        issueDate: '2026-04-11',
+        customerCui: 'RO87654321',
+        line: ['x|1|100|19'],
+        invoiceTypeCode: '384',
+      }
+    );
+    expect(h.ublService.lastAction?.invoice.invoiceTypeCode).toBe('384');
+  });
+
   it('writes XML to --out and emits confirmation to stderr', async () => {
     const h = harness();
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-cli-ubl-'));

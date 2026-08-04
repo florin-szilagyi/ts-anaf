@@ -162,6 +162,13 @@ export const UBL_CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017#compliant#urn:efact
  */
 export const INVOICE_TYPE_CODE = '380';
 
+/**
+ * Invoice type codes (BT-3) accepted by CIUS-RO — the UNTDID 1001 subset:
+ * '380' Commercial invoice, '384' Corrective invoice, '389' Self-billed
+ * invoice, '751' Invoice information for accounting purposes.
+ */
+export const ALLOWED_INVOICE_TYPE_CODES = ['380', '384', '389', '751'] as const;
+
 // =============================================================================
 // Token Validity (per ANAF documentation)
 // =============================================================================

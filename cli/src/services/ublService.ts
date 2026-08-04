@@ -52,6 +52,7 @@ export class UblService {
 
     const invoice: InvoiceInput = {
       invoiceNumber: action.invoice.invoiceNumber,
+      invoiceTypeCode: action.invoice.invoiceTypeCode,
       issueDate: action.invoice.issueDate,
       dueDate: action.invoice.dueDate ?? action.invoice.overrides?.dueDate,
       currency: action.invoice.currency ?? action.invoice.overrides?.currency ?? 'RON',

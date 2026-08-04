@@ -89,6 +89,11 @@ function ublBuildManifestJsonSchema(): Record<string, unknown> {
               ],
             },
           },
+          invoiceTypeCode: {
+            enum: ['380', '384', '389', '751'],
+            description:
+              'Invoice type code (BT-3), CIUS-RO subset of UNTDID 1001: 380 commercial invoice (default), 384 corrective invoice, 389 self-billed invoice, 751 invoice information for accounting purposes.',
+          },
           currency: { type: 'string', minLength: 1 },
           note: { type: 'string', minLength: 1 },
           paymentIban: { type: 'string', minLength: 1 },
