@@ -105,6 +105,8 @@ All errors are `CliError` instances with a `category` (`generic`=1, `user_input`
 ## Release
 
 - SDK: push a tag `sdk-v*.*.*` triggers `publish.yaml` (npm publish).
-- CLI: push a tag `cli-v*.*.*` triggers `cli-release.yaml` (builds SEA binaries for darwin-arm64/x64 + linux-x64, publishes npm, drafts GitHub Release).
+- CLI: push a tag `cli-v*.*.*` triggers `cli-release.yaml` (builds SEA binaries for darwin-arm64 + linux-x64, publishes npm, creates GitHub Release, updates Homebrew tap).
 - MCP: push a tag `mcp-v*.*.*` triggers `mcp-publish.yaml` (npm publish).
+- Alternatively, each workflow can be run via `workflow_dispatch` with `dry_run=false` — it publishes the version currently in the package's `package.json` and creates the release tag itself. The default `dry_run=true` builds and tests without publishing.
+- npm auth uses Trusted Publishing (OIDC) — each package is bound to its workflow on npmjs.com; there is no `NPM_TOKEN` secret.
 - Homebrew tap: `florin-szilagyi/homebrew-anaf-cli` — formula at `cli/Formula/anaf-cli.rb` (SHA256 placeholders updated per release).

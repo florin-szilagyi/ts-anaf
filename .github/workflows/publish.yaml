@@ -1,5 +1,16 @@
 name: Publish SDK (anaf-ts-sdk)
 
+# ──────────────────────────────────────────────────────────────
+# Trigger:
+#   • Push of a tag matching sdk-v*.*.*
+#   • Manual run via workflow_dispatch — dry-run by default; with
+#     dry_run=false it publishes for real and creates the sdk-v* tag itself.
+#
+# npm auth uses Trusted Publishing (OIDC): the job mints a short-lived
+# credential via id-token permissions — no NPM_TOKEN secret involved.
+# Each package must have this workflow configured as a Trusted Publisher
+# on npmjs.com before the publish step can succeed.
+# ──────────────────────────────────────────────────────────────
 on:
   push:
     tags:
@@ -7,18 +18,18 @@ on:
       - 'sdk-v*.*.*-*'
   workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Version bump (patch / minor / major)'
+      dry_run:
+        description: 'Build and test but skip npm publish and tag creation'
         required: false
-        default: 'patch'
+        default: 'true'
 
 jobs:
   publish:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
-      packages: write
+      contents: write # push the sdk-v* tag on real dispatch runs
+      id-token: write # npm Trusted Publishing (OIDC)
 
     steps:
       - name: Checkout
@@ -28,13 +39,12 @@ jobs:
 
       - uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10
           run_install: false
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-          registry-url: 'https://registry.npmjs.org/'
 
       - name: Install packages
         run: pnpm install --frozen-lockfile
@@ -46,6 +56,25 @@ jobs:
         run: pnpm --filter @florinszilagyi/anaf-ts-sdk run validate
 
       - name: Publish SDK
-        run: pnpm --filter @florinszilagyi/anaf-ts-sdk publish --access public --no-git-checks
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN_INPUT: ${{ github.event.inputs.dry_run }}
+        run: |
+          cd sdk
+          if [ "$EVENT_NAME" = "push" ] || [ "$DRY_RUN_INPUT" != "true" ]; then
+            pnpm publish --access public --no-git-checks
+          else
+            pnpm publish --access public --no-git-checks --dry-run
+          fi
+
+      - name: Create and push release tag
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true'
+        run: |
+          VERSION=$(node -p "require('./sdk/package.json').version")
+          TAG="sdk-v${VERSION}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists on origin; skipping."
+          else
+            git tag "${TAG}"
+            git push origin "${TAG}"
+          fi
