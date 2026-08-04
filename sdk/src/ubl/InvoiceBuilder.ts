@@ -11,6 +11,7 @@ import {
 import {
   UBL_CUSTOMIZATION_ID,
   INVOICE_TYPE_CODE,
+  ALLOWED_INVOICE_TYPE_CODES,
   DEFAULT_CURRENCY,
   DEFAULT_COUNTRY_CODE,
   DEFAULT_UNIT_CODE,
@@ -201,6 +202,18 @@ function validateInvoiceInput(input: InvoiceInput): void {
 
   if (!input.issueDate) {
     throw new AnafValidationError('Issue date is required');
+  }
+
+  // BT-3: reject unknown type codes locally rather than letting ANAF's
+  // schematron produce an opaque rejection after upload.
+  if (
+    input.invoiceTypeCode !== undefined &&
+    !(ALLOWED_INVOICE_TYPE_CODES as readonly string[]).includes(input.invoiceTypeCode)
+  ) {
+    throw new AnafValidationError(
+      `Invoice type code '${input.invoiceTypeCode}' is not accepted by CIUS-RO; ` +
+        `allowed values: ${ALLOWED_INVOICE_TYPE_CODES.join(', ')}`
+    );
   }
 
   // Validate supplier
@@ -614,7 +627,7 @@ export function buildInvoiceXml(input: InvoiceInput): string {
     .txt(dueDate)
     .up()
     .ele('cbc:InvoiceTypeCode')
-    .txt(INVOICE_TYPE_CODE)
+    .txt(input.invoiceTypeCode ?? INVOICE_TYPE_CODE)
     .up();
 
   // Note (optional)
