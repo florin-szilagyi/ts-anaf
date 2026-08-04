@@ -265,6 +265,35 @@ describe('UblService.buildFromAction', () => {
     expect(result.xml).toContain('<cbc:TaxCurrencyCode>RON</cbc:TaxCurrencyCode>');
     expect(result.xml).toContain('<cbc:TaxAmount currencyID="RON">530.25</cbc:TaxAmount>');
   });
+
+  it('passes invoiceTypeCode through to the invoice and the emitted XML', async () => {
+    const { service } = harness();
+    const action = normalizeUblBuildAction({
+      context: 'RO12345678',
+      invoiceNumber: 'FCT-TYPE',
+      issueDate: '2026-08-04',
+      customerCui: 'RO87654321',
+      lines: ['Serviciu|1|100|19'],
+      invoiceTypeCode: '751',
+    });
+    const result = await service.buildFromAction(action);
+    expect(result.invoice.invoiceTypeCode).toBe('751');
+    expect(result.xml).toContain('<cbc:InvoiceTypeCode>751</cbc:InvoiceTypeCode>');
+  });
+
+  it('emits the default InvoiceTypeCode 380 when invoiceTypeCode is omitted', async () => {
+    const { service } = harness();
+    const action = normalizeUblBuildAction({
+      context: 'RO12345678',
+      invoiceNumber: 'FCT-DEFAULT',
+      issueDate: '2026-08-04',
+      customerCui: 'RO87654321',
+      lines: ['Serviciu|1|100|19'],
+    });
+    const result = await service.buildFromAction(action);
+    expect(result.invoice.invoiceTypeCode).toBeUndefined();
+    expect(result.xml).toContain('<cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
+  });
 });
 
 describe('companyToParty county extraction', () => {

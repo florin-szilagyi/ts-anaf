@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository structure
 
-This is a pnpm workspace monorepo with two packages:
+This is a pnpm workspace monorepo with three packages:
 
 - **`sdk/`** — `anaf-ts-sdk`: TypeScript SDK for the Romanian ANAF e-Factura API (OAuth, document upload/download/validation, UBL invoice generation, company lookup).
 - **`cli/`** — `anaf-cli`: CLI wrapping the SDK. Supports imperative commands and YAML manifest mode for AI agents/CI.
+- **`mcp/`** — `anaf-mcp`: MCP server wrapping the SDK (lookup, UBL build, upload, status, download, messages, validate as tools).
 
-Workspace root is private; both packages publish independently to npm.
+Workspace root is private; all packages publish independently to npm.
 
 ## Commands
 
@@ -103,6 +104,7 @@ All errors are `CliError` instances with a `category` (`generic`=1, `user_input`
 
 ## Release
 
-- SDK: push to `main` with changes in `sdk/` triggers the SDK publish workflow.
+- SDK: push a tag `sdk-v*.*.*` triggers `publish.yaml` (npm publish).
 - CLI: push a tag `cli-v*.*.*` triggers `cli-release.yaml` (builds SEA binaries for darwin-arm64/x64 + linux-x64, publishes npm, drafts GitHub Release).
+- MCP: push a tag `mcp-v*.*.*` triggers `mcp-publish.yaml` (npm publish).
 - Homebrew tap: `florin-szilagyi/homebrew-anaf-cli` — formula at `cli/Formula/anaf-cli.rb` (SHA256 placeholders updated per release).

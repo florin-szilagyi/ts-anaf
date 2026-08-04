@@ -34,6 +34,13 @@ export const buildUblInputSchema = z.object({
   invoiceNumber: z.string(),
   issueDate: z.string().describe('ISO date string (YYYY-MM-DD)'),
   dueDate: z.string().optional(),
+  invoiceTypeCode: z
+    .enum(['380', '384', '389', '751'])
+    .optional()
+    .describe(
+      'Invoice type code (BT-3), CIUS-RO subset of UNTDID 1001: 380 commercial invoice (default), ' +
+        '384 corrective invoice, 389 self-billed invoice, 751 invoice information for accounting purposes'
+    ),
   currency: z.string().optional(),
   note: z.string().optional(),
   invoicePeriodEndDate: z.string().optional(),

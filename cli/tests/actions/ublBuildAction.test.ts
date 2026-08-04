@@ -119,6 +119,48 @@ describe('normalizeUblBuildAction', () => {
     expect((err as CliError).code).toBe('INVALID_CUI');
   });
 
+  it('passes invoiceTypeCode through to the action', () => {
+    const action = normalizeUblBuildAction({
+      context: 'acme-prod',
+      invoiceNumber: 'FCT-1',
+      issueDate: '2026-04-11',
+      customerCui: 'RO87654321',
+      lines: ['x|1|1|0'],
+      invoiceTypeCode: '751',
+    });
+    expect(action.invoice.invoiceTypeCode).toBe('751');
+  });
+
+  it('leaves invoiceTypeCode undefined when omitted (SDK defaults to 380)', () => {
+    const action = normalizeUblBuildAction({
+      context: 'acme-prod',
+      invoiceNumber: 'FCT-1',
+      issueDate: '2026-04-11',
+      customerCui: 'RO87654321',
+      lines: ['x|1|1|0'],
+    });
+    expect(action.invoice.invoiceTypeCode).toBeUndefined();
+  });
+
+  it('rejects an invoice type code outside the CIUS-RO list (380/384/389/751)', () => {
+    let err: unknown;
+    try {
+      normalizeUblBuildAction({
+        context: 'acme-prod',
+        invoiceNumber: 'FCT-1',
+        issueDate: '2026-04-11',
+        customerCui: 'RO87654321',
+        lines: ['x|1|1|0'],
+        invoiceTypeCode: '999',
+      } as never);
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).code).toBe('INVALID_INVOICE_INPUT');
+    expect((err as CliError).category).toBe('user_input');
+  });
+
   it('passes through overrides', () => {
     const action = normalizeUblBuildAction({
       context: 'acme-prod',

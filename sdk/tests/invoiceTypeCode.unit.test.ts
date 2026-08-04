@@ -52,14 +52,11 @@ describe('InvoiceTypeCode (BT-3) via invoiceTypeCode', () => {
       expect(xml).not.toContain('<cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
     });
 
-    test.each<InvoiceTypeCode>(['380', '384', '389', '751'])(
-      'accepts CIUS-RO code %s',
-      (code) => {
-        const xml = builder.generateInvoiceXml(buildInput({ invoiceTypeCode: code }));
+    test.each<InvoiceTypeCode>(['380', '384', '389', '751'])('accepts CIUS-RO code %s', (code) => {
+      const xml = builder.generateInvoiceXml(buildInput({ invoiceTypeCode: code }));
 
-        expect(xml).toContain(`<cbc:InvoiceTypeCode>${code}</cbc:InvoiceTypeCode>`);
-      }
-    );
+      expect(xml).toContain(`<cbc:InvoiceTypeCode>${code}</cbc:InvoiceTypeCode>`);
+    });
 
     test('a corrective (storno) invoice can be typed 384 explicitly', () => {
       const xml = builder.generateInvoiceXml(

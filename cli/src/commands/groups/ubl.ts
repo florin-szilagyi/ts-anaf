@@ -13,6 +13,7 @@ interface UblBuildCmdOpts {
   dueDate?: string;
   customerCui?: string;
   line?: string[];
+  invoiceTypeCode?: string;
   currency?: string;
   taxCurrencyTaxAmount?: string;
   paymentIban?: string;
@@ -147,6 +148,7 @@ function buildInputFromFlags(opts: UblBuildCmdOpts, supplierCui: string): UblBui
     dueDate: opts.dueDate,
     customerCui: opts.customerCui!,
     lines: opts.line!,
+    invoiceTypeCode: opts.invoiceTypeCode as UblBuildInput['invoiceTypeCode'],
     currency: opts.currency,
     taxCurrencyTaxAmount: opts.taxCurrencyTaxAmount !== undefined ? parseFloat(opts.taxCurrencyTaxAmount) : undefined,
     paymentIban: opts.paymentIban,
@@ -262,6 +264,10 @@ export function registerUbl(parent: Command, deps: CommandDeps): void {
     .option('--due-date <date>', 'due date (YYYY-MM-DD)')
     .option('--customer-cui <cui>', 'customer CUI')
     .option('--line <line>', 'invoice line: "desc|qty|unitPrice|taxPct[|unitCode]"', collectLine, [] as string[])
+    .option(
+      '--invoice-type-code <code>',
+      'invoice type code (BT-3): 380 commercial (default), 384 corrective, 389 self-billed, 751 accounting'
+    )
     .option('--currency <code>', 'currency code')
     .option(
       '--tax-currency-tax-amount <amount>',
