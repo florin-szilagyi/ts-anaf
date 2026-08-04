@@ -156,9 +156,12 @@ jobs:
         with:
           version: 10
           run_install: false
+      # This job publishes but builds no SEA binary, so it is exempt from the
+      # NODE_VERSION pin: Node >= 22.14 gives npm CLI >= 11.5.1, the minimum
+      # for npm Trusted Publishing (OIDC); pnpm publish delegates to that npm.
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 24
           cache: pnpm
       - name: Download all artifacts
         uses: actions/download-artifact@v4
