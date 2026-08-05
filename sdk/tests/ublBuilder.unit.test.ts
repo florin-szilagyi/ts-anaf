@@ -1690,6 +1690,258 @@ describe('UblBuilder Tests', () => {
     });
   });
 
+  describe('Multi-rate VAT groups with document-level AllowanceCharge', () => {
+    /**
+     * EN 16931 / CIUS-RO treat the VAT category (BT-118) and the VAT rate (BT-119) as
+     * independent: Romania's 21% and 11% rates are both category 'S'. A tax group is
+     * therefore identified by the (category, percent) PAIR, never by the category alone.
+     *
+     * These tests pin that a document-level allowance/charge — the only thing that makes
+     * the builder rewrite the tax groups — keeps one cac:TaxSubtotal per distinct rate.
+     *
+     * Emission order: line tax groups first, in first-appearance order of the lines, then
+     * any group created solely by an allowance/charge, in the order those appear.
+     */
+
+    /** All cac:TaxSubtotal blocks, in document order. */
+    const taxSubtotalsOf = (xml: string): string[] => xml.match(/<cac:TaxSubtotal>[\s\S]*?<\/cac:TaxSubtotal>/g) ?? [];
+
+    /** Two 100 RON lines at Romania's 21% and 11% rates — both category 'S'. */
+    const twoRateLines = [
+      { description: 'Standard rated', quantity: 1, unitPrice: 100, taxPercent: 21 },
+      { description: 'Reduced rated', quantity: 1, unitPrice: 100, taxPercent: 11 },
+    ];
+
+    test('two rates + one allowance per rate: each rate keeps its own TaxSubtotal', () => {
+      // A document-level discount on a mixed-rate invoice must be split into one
+      // allowance per distinct VAT rate (CIUS-RO). Before the (category, percent) keying
+      // the second group overwrote the first: 1 subtotal, VAT 8.80, TaxInclusive 188.80.
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        lines: twoRateLines,
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 10, reason: 'Discount 21% share', taxCategoryId: 'S', taxPercent: 21 },
+          { chargeIndicator: false, amount: 10, reason: 'Discount 11% share', taxCategoryId: 'S', taxPercent: 11 },
+        ],
+      });
+
+      const subtotals = taxSubtotalsOf(xml);
+      expect(subtotals).toHaveLength(2);
+
+      // 21% group: 100 − 10 = 90 base, 90 * 21% = 18.90 VAT.
+      expect(subtotals[0]).toContain('<cbc:TaxableAmount currencyID="RON">90.00</cbc:TaxableAmount>');
+      expect(subtotals[0]).toContain('<cbc:TaxAmount currencyID="RON">18.90</cbc:TaxAmount>');
+      expect(subtotals[0]).toContain('<cbc:ID>S</cbc:ID>');
+      expect(subtotals[0]).toContain('<cbc:Percent>21.00</cbc:Percent>');
+
+      // 11% group: 100 − 10 = 90 base, 90 * 11% = 9.90 VAT.
+      expect(subtotals[1]).toContain('<cbc:TaxableAmount currencyID="RON">90.00</cbc:TaxableAmount>');
+      expect(subtotals[1]).toContain('<cbc:TaxAmount currencyID="RON">9.90</cbc:TaxAmount>');
+      expect(subtotals[1]).toContain('<cbc:ID>S</cbc:ID>');
+      expect(subtotals[1]).toContain('<cbc:Percent>11.00</cbc:Percent>');
+
+      // Totals: 18.90 + 9.90 = 28.80 VAT on a 180.00 taxable base.
+      expect(xml).toContain('<cbc:LineExtensionAmount currencyID="RON">200.00</cbc:LineExtensionAmount>');
+      expect(xml).toContain('<cbc:AllowanceTotalAmount currencyID="RON">20.00</cbc:AllowanceTotalAmount>');
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">180.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">208.80</cbc:TaxInclusiveAmount>');
+      expect(xml).toContain('<cbc:PayableAmount currencyID="RON">208.80</cbc:PayableAmount>');
+
+      // The collapsed-group signature must not reappear.
+      expect(xml).not.toContain('<cbc:TaxInclusiveAmount currencyID="RON">188.80</cbc:TaxInclusiveAmount>');
+
+      // Both AllowanceCharge blocks keep their own rate.
+      const acBlocks = xml.match(/<cac:AllowanceCharge>[\s\S]*?<\/cac:AllowanceCharge>/g) ?? [];
+      expect(acBlocks).toHaveLength(2);
+      expect(acBlocks[0]).toContain('<cbc:Percent>21.00</cbc:Percent>');
+      expect(acBlocks[1]).toContain('<cbc:Percent>11.00</cbc:Percent>');
+    });
+
+    test('allowance at a rate no line carries gets its own group instead of eating another S group', () => {
+      // Single 21% line, allowance declared at 11% → the fallback must synthesise a
+      // separate (S, 11) group. Before the fix the allowance was subtracted from the
+      // 21% group instead: 1 subtotal of 90.00 / 18.90.
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        lines: [{ description: 'Standard rated', quantity: 1, unitPrice: 100, taxPercent: 21 }],
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 10, reason: 'Reduced-rate rebate', taxCategoryId: 'S', taxPercent: 11 },
+        ],
+      });
+
+      const subtotals = taxSubtotalsOf(xml);
+      expect(subtotals).toHaveLength(2);
+
+      // The 21% group is untouched — this is the whole point.
+      expect(subtotals[0]).toContain('<cbc:TaxableAmount currencyID="RON">100.00</cbc:TaxableAmount>');
+      expect(subtotals[0]).toContain('<cbc:TaxAmount currencyID="RON">21.00</cbc:TaxAmount>');
+      expect(subtotals[0]).toContain('<cbc:Percent>21.00</cbc:Percent>');
+
+      // The synthesised 11% group carries the adjustment alone. A negative base is the
+      // pre-existing semantics of the "no line at this rate" fallback (an allowance can
+      // only subtract); the fix changes where it lands, not how it is computed.
+      expect(subtotals[1]).toContain('<cbc:TaxableAmount currencyID="RON">-10.00</cbc:TaxableAmount>');
+      expect(subtotals[1]).toContain('<cbc:TaxAmount currencyID="RON">-1.10</cbc:TaxAmount>');
+      expect(subtotals[1]).toContain('<cbc:Percent>11.00</cbc:Percent>');
+
+      // 21.00 − 1.10 = 19.90 VAT on a 90.00 base.
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">90.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">109.90</cbc:TaxInclusiveAmount>');
+    });
+
+    test("category 'O' allowance merges into the invoice's single 'O' group (percent is not part of the O key)", () => {
+      // Category 'O' has no meaningful percent (BR-O-05 forbids cbc:Percent) and always
+      // has taxAmount = 0, so percent must be excluded from its group key. The line group
+      // is stored as (O, 0) while the resolved allowance carries percent undefined — a
+      // naive `${categoryId}-${percent}` key would split those into two 'O' subtotals.
+      const nonVatSupplier: Party = {
+        ...mockTestData.invoiceData.supplier,
+        vatNumber: undefined,
+      };
+
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        supplier: nonVatSupplier,
+        isSupplierVatPayer: false,
+        lines: [{ description: 'Service', quantity: 1, unitPrice: 100, taxPercent: 0 }],
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 30, reason: 'Discount' }],
+      });
+
+      const subtotals = taxSubtotalsOf(xml);
+      expect(subtotals).toHaveLength(1);
+      expect(subtotals[0]).toContain('<cbc:TaxableAmount currencyID="RON">70.00</cbc:TaxableAmount>');
+      expect(subtotals[0]).toContain('<cbc:TaxAmount currencyID="RON">0.00</cbc:TaxAmount>');
+      expect(subtotals[0]).toContain('<cbc:ID>O</cbc:ID>');
+      expect(subtotals[0]).not.toContain('<cbc:Percent>');
+      expect(subtotals[0]).toContain('<cbc:TaxExemptionReasonCode>VATEX-EU-O</cbc:TaxExemptionReasonCode>');
+    });
+
+    test("category 'O' allowance on a multi-rate invoice sits alongside both rated groups", () => {
+      // Three distinct groups: (S, 21), (S, 11) and (O). Before the fix the two S groups
+      // collapsed and only 2 subtotals were emitted, with VAT 11.00 instead of 32.00.
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        lines: twoRateLines,
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 10, reason: 'Non-taxable rebate', taxCategoryId: 'O', taxPercent: 0 },
+        ],
+      });
+
+      const subtotals = taxSubtotalsOf(xml);
+      expect(subtotals).toHaveLength(3);
+
+      expect(subtotals[0]).toContain('<cbc:TaxableAmount currencyID="RON">100.00</cbc:TaxableAmount>');
+      expect(subtotals[0]).toContain('<cbc:TaxAmount currencyID="RON">21.00</cbc:TaxAmount>');
+      expect(subtotals[0]).toContain('<cbc:Percent>21.00</cbc:Percent>');
+
+      expect(subtotals[1]).toContain('<cbc:TaxableAmount currencyID="RON">100.00</cbc:TaxableAmount>');
+      expect(subtotals[1]).toContain('<cbc:TaxAmount currencyID="RON">11.00</cbc:TaxAmount>');
+      expect(subtotals[1]).toContain('<cbc:Percent>11.00</cbc:Percent>');
+
+      // 'O' carries the allowance, no VAT and no Percent.
+      expect(subtotals[2]).toContain('<cbc:TaxableAmount currencyID="RON">-10.00</cbc:TaxableAmount>');
+      expect(subtotals[2]).toContain('<cbc:TaxAmount currencyID="RON">0.00</cbc:TaxAmount>');
+      expect(subtotals[2]).toContain('<cbc:ID>O</cbc:ID>');
+      expect(subtotals[2]).not.toContain('<cbc:Percent>');
+
+      // 21.00 + 11.00 + 0.00 = 32.00 VAT on a 190.00 base.
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">190.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">222.00</cbc:TaxInclusiveAmount>');
+    });
+
+    test('allowance at 21% and charge at 11% each adjust only their own group', () => {
+      // Both directions flow through the same grouping code. Before the fix the two S
+      // groups collapsed and the net −10 + 20 landed on a single 11% base: VAT 12.10.
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        lines: twoRateLines,
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 10, reason: 'Discount', taxCategoryId: 'S', taxPercent: 21 },
+          { chargeIndicator: true, amount: 20, reason: 'Shipping', taxCategoryId: 'S', taxPercent: 11 },
+        ],
+      });
+
+      const subtotals = taxSubtotalsOf(xml);
+      expect(subtotals).toHaveLength(2);
+
+      // 21% group: 100 − 10 = 90 base, 18.90 VAT.
+      expect(subtotals[0]).toContain('<cbc:TaxableAmount currencyID="RON">90.00</cbc:TaxableAmount>');
+      expect(subtotals[0]).toContain('<cbc:TaxAmount currencyID="RON">18.90</cbc:TaxAmount>');
+      expect(subtotals[0]).toContain('<cbc:Percent>21.00</cbc:Percent>');
+
+      // 11% group: 100 + 20 = 120 base, 13.20 VAT.
+      expect(subtotals[1]).toContain('<cbc:TaxableAmount currencyID="RON">120.00</cbc:TaxableAmount>');
+      expect(subtotals[1]).toContain('<cbc:TaxAmount currencyID="RON">13.20</cbc:TaxAmount>');
+      expect(subtotals[1]).toContain('<cbc:Percent>11.00</cbc:Percent>');
+
+      // 18.90 + 13.20 = 32.10 VAT on a 210.00 base.
+      expect(xml).toContain('<cbc:AllowanceTotalAmount currencyID="RON">10.00</cbc:AllowanceTotalAmount>');
+      expect(xml).toContain('<cbc:ChargeTotalAmount currencyID="RON">20.00</cbc:ChargeTotalAmount>');
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">210.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">242.10</cbc:TaxInclusiveAmount>');
+    });
+
+    test('multi-rate invoice with no document allowances is byte-identical to the v1.5.0 output', () => {
+      // The allowance code path early-returns when there is nothing to apply, so this
+      // invoice must be completely unaffected. The two literals below were captured from
+      // v1.5.0 (pre-fix) output and must survive the change unchanged.
+      const multiRateInvoice: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        lines: twoRateLines,
+      };
+
+      const xml = builder.generateInvoiceXml(multiRateInvoice);
+
+      const taxTotal = xml.substring(
+        xml.indexOf('<cac:TaxTotal>'),
+        xml.indexOf('</cac:TaxTotal>') + '</cac:TaxTotal>'.length
+      );
+      expect(taxTotal).toBe(
+        `<cac:TaxTotal>
+    <cbc:TaxAmount currencyID="RON">32.00</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="RON">100.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="RON">21.00</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>21.00</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="RON">100.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="RON">11.00</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>11.00</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>`
+      );
+
+      const legalMonetaryTotal = xml.substring(
+        xml.indexOf('<cac:LegalMonetaryTotal>'),
+        xml.indexOf('</cac:LegalMonetaryTotal>') + '</cac:LegalMonetaryTotal>'.length
+      );
+      expect(legalMonetaryTotal).toBe(
+        `<cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="RON">200.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="RON">200.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="RON">232.00</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="RON">232.00</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>`
+      );
+
+      // An empty documentAllowanceCharges array takes the same early-return path.
+      expect(builder.generateInvoiceXml({ ...multiRateInvoice, documentAllowanceCharges: [] })).toBe(xml);
+    });
+  });
+
   describe('Performance Tests', () => {
     test('should generate XML quickly for simple invoices', () => {
       const start = Date.now();
