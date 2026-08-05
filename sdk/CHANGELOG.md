@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-08-06
+
+### Fixed
+
+- Document-level allowances/charges no longer collapse VAT breakdown groups
+  that share a category but differ in rate (e.g. Romania's 21% and 11%, both
+  category `S`). Tax groups are now keyed by the (category, percent) pair, so
+  a mixed-rate invoice with a document discount emits one `cac:TaxSubtotal`
+  per rate. Additionally, an allowance whose category matches several line
+  rates without an explicit `taxPercent` now throws instead of silently
+  inheriting the first rate.
+
 ## [1.5.0] - 2026-08-04
 
 ### Added
