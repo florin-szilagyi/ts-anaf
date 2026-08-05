@@ -376,13 +376,15 @@ interface ResolvedAllowanceTaxCategory {
  * Resolution order:
  *  1. If both `taxCategoryId` and `taxPercent` are explicit on the allowance, use them.
  *  2. If `taxCategoryId` is explicit but `taxPercent` is missing, infer the percent from
- *     the matching line tax group (or default to 0 for 'Z'/'O', error if 'S' has no match).
+ *     the single matching line tax group (or default to 0 for 'Z'/'O', error if 'S' has
+ *     no match, error if several line groups share the category at different rates).
  *  3. If neither is explicit and the lines have a single tax group, inherit from it.
  *  4. Otherwise (lines have mixed tax groups), throw — caller must disambiguate.
  *
  * @throws {AnafValidationError} If lines have mixed tax categories and the allowance
- *   does not specify `taxCategoryId`, or if an explicit `taxCategoryId` references
- *   a standard-rated ('S') category with no matching line group to infer the percent from.
+ *   does not specify `taxCategoryId`, if an explicit `taxCategoryId` references
+ *   a standard-rated ('S') category with no matching line group to infer the percent from,
+ *   or if it references a category carried by several line groups at different rates.
  */
 function resolveAllowanceTaxCategory(
   ac: DocumentAllowanceCharge,
@@ -405,11 +407,24 @@ function resolveAllowanceTaxCategory(
 
   // Explicit category provided.
   if (ac.taxCategoryId) {
-    const matching = taxGroups.find((g) => g.categoryId === ac.taxCategoryId);
+    const matches = taxGroups.filter((g) => g.categoryId === ac.taxCategoryId);
+    const matching = matches[0];
     let percent: number;
     if (ac.taxPercent !== undefined) {
       percent = ac.taxPercent;
     } else if (matching) {
+      // A category does not identify a tax group on its own: category (BT-118) and rate
+      // (BT-119) are independent, so 'S' can cover several rates. Inheriting the first
+      // match would file VAT at the wrong rate on an invoice whose totals still
+      // reconcile — undetectable downstream — so refuse to guess.
+      const candidatePercents = Array.from(new Set(matches.map((g) => g.percent)));
+      if (ac.taxCategoryId !== 'O' && candidatePercents.length > 1) {
+        throw new AnafValidationError(
+          `${label}: taxPercent is required because invoice lines carry several '${ac.taxCategoryId}' VAT rates ` +
+            `(${candidatePercents.map((p) => `${p}%`).join(', ')}) — category and rate are independent, so ` +
+            `'${ac.taxCategoryId}' alone does not identify a tax group; set taxPercent to the rate this applies to`
+        );
+      }
       percent = matching.percent;
     } else if (ac.taxCategoryId === 'Z') {
       percent = 0;
@@ -445,13 +460,38 @@ function resolveAllowanceTaxCategory(
 }
 
 /**
- * Apply resolved document-level allowances/charges to the per-category tax groups.
+ * Identity of a VAT breakdown group (BG-23), used to key the tax-group map.
+ *
+ * In EN 16931 / CIUS-RO the VAT category (BT-118) and the VAT rate (BT-119) are
+ * independent: Romania's 21% and 11% rates are both category 'S'. A group is
+ * therefore identified by the (category, percent) pair, not by the category alone —
+ * keying by category would silently merge two distinct rates into one
+ * `cac:TaxSubtotal`. Mirrors the key used by {@link groupLinesByTax}.
+ *
+ * Category 'O' (not subject to VAT) is the one exception: BR-O-05 forbids
+ * `cbc:Percent` on it and its `taxAmount` is always 0, so its percent carries no
+ * meaning and is deliberately excluded from the key. That keeps a resolved 'O'
+ * allowance (percent `undefined`) and an 'O' line group (percent `0`) in the same
+ * group instead of splitting them into two spurious 'O' subtotals.
+ */
+function taxGroupKey(categoryId: string, percent: number | undefined): string {
+  return categoryId === 'O' ? 'O' : `${categoryId}-${percent ?? 0}`;
+}
+
+/**
+ * Apply resolved document-level allowances/charges to the per-group tax groups.
  *
  * For each allowance (`chargeIndicator=false`), the matching group's `taxableAmount`
  * is decreased; for each charge (`chargeIndicator=true`), it is increased. The
  * group's `taxAmount` is then re-derived from the adjusted taxable amount and the
  * group's percent. This satisfies CIUS-RO BR-CO-17 / BR-DEC-19, where each
  * `cac:TaxSubtotal` reflects the apportioned base after document-level adjustments.
+ *
+ * Groups are matched on the (category, percent) pair — see {@link taxGroupKey}.
+ *
+ * Emission order is deterministic: the returned array lists the line tax groups
+ * first, in the order {@link groupLinesByTax} produced them, followed by any group
+ * created solely by an allowance/charge, in the order those appear on the invoice.
  *
  * Returns a new array; the input array is not mutated.
  */
@@ -464,13 +504,14 @@ function applyAllowancesToTaxGroups(
   }
 
   // Clone so we don't mutate the caller's groups.
-  const groupsByCategory = new Map<string, TaxGroup>();
-  taxGroups.forEach((g) => groupsByCategory.set(g.categoryId, { ...g }));
+  const groupsByKey = new Map<string, TaxGroup>();
+  taxGroups.forEach((g) => groupsByKey.set(taxGroupKey(g.categoryId, g.percent), { ...g }));
 
   resolvedAllowances.forEach(({ ac, resolved }) => {
-    let group = groupsByCategory.get(resolved.categoryId);
+    const key = taxGroupKey(resolved.categoryId, resolved.percent);
+    let group = groupsByKey.get(key);
     if (!group) {
-      // No line was rated at this category — create an empty group so the
+      // No line was rated at this category/percent — create an empty group so the
       // adjustment still appears in the VAT breakdown.
       group = {
         categoryId: resolved.categoryId,
@@ -479,7 +520,7 @@ function applyAllowancesToTaxGroups(
         taxAmount: 0,
         exemptionReasonCode: resolved.exemptionReasonCode,
       };
-      groupsByCategory.set(resolved.categoryId, group);
+      groupsByKey.set(key, group);
     }
 
     const delta = ac.chargeIndicator ? ac.amount : -ac.amount;
@@ -488,7 +529,7 @@ function applyAllowancesToTaxGroups(
 
   // Re-derive taxAmount from the adjusted taxableAmount, except for category 'O'
   // (not subject to VAT) which always has taxAmount = 0 and no percent.
-  groupsByCategory.forEach((group) => {
+  groupsByKey.forEach((group) => {
     if (group.categoryId === 'O') {
       group.taxAmount = 0;
     } else {
@@ -496,7 +537,7 @@ function applyAllowancesToTaxGroups(
     }
   });
 
-  return Array.from(groupsByCategory.values());
+  return Array.from(groupsByKey.values());
 }
 
 /**
