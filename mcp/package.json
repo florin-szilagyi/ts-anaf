@@ -3,6 +3,15 @@
   "version": "1.1.0",
   "description": "MCP server for the ANAF e-Factura SDK — exposes lookup, UBL, upload, status, download, messages, validate as tools",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/florin-szilagyi/ts-anaf.git",
+    "directory": "mcp"
+  },
+  "homepage": "https://github.com/florin-szilagyi/ts-anaf#readme",
+  "bugs": {
+    "url": "https://github.com/florin-szilagyi/ts-anaf/issues"
+  },
   "author": {
     "name": "Florin Szilagyi",
     "url": "https://github.com/florin-szilagyi"
