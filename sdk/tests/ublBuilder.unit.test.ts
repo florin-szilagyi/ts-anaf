@@ -1942,6 +1942,135 @@ describe('UblBuilder Tests', () => {
     });
   });
 
+  describe('Ambiguous VAT rate on a document-level AllowanceCharge', () => {
+    /**
+     * A tax category does not identify a tax group on its own — 'S' can cover several
+     * rates. When an allowance names a category that several line groups share and does
+     * not say which rate it applies to, the builder must refuse to guess.
+     *
+     * Guessing is worse than failing here: inheriting the wrong rate yields an invoice
+     * that reconciles arithmetically (every total still adds up) while filing the wrong
+     * amount of VAT, which is close to undetectable downstream.
+     */
+
+    const twoRateLines = [
+      { description: 'Standard rated', quantity: 1, unitPrice: 100, taxPercent: 21 },
+      { description: 'Reduced rated', quantity: 1, unitPrice: 100, taxPercent: 11 },
+    ];
+
+    const taxSubtotalsOf = (xml: string): string[] => xml.match(/<cac:TaxSubtotal>[\s\S]*?<\/cac:TaxSubtotal>/g) ?? [];
+
+    test("allowance naming category 'S' without taxPercent throws when lines carry several 'S' rates", () => {
+      // Previously this silently inherited the FIRST matching group's percent (21), so a
+      // discount meant for the 11% base was filed at 21%.
+      const invoiceData: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        lines: twoRateLines,
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 10, reason: 'Discount', taxCategoryId: 'S' }],
+      };
+
+      // UblBuilder wraps the builder error in AnafValidationError — assert on the
+      // inner message text, as the other throwing tests in this file do.
+      expect(() => builder.generateInvoiceXml(invoiceData)).toThrow(/taxPercent is required/);
+
+      // The message must name the category and both candidate rates — a generic
+      // "ambiguous" string would leave the caller guessing which value to supply.
+      let message = '';
+      try {
+        builder.generateInvoiceXml(invoiceData);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain('Allowance/Charge 1');
+      expect(message).toContain('taxPercent');
+      expect(message).toContain("'S'");
+      expect(message).toContain('21%');
+      expect(message).toContain('11%');
+    });
+
+    test('allowance with an explicit taxPercent is unambiguous and lands in that rate group', () => {
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        lines: twoRateLines,
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 10, reason: 'Discount', taxCategoryId: 'S', taxPercent: 11 },
+        ],
+      });
+
+      const subtotals = taxSubtotalsOf(xml);
+      expect(subtotals).toHaveLength(2);
+
+      // 21% group untouched, 11% group carries the discount: 100 − 10 = 90 → 9.90 VAT.
+      expect(subtotals[0]).toContain('<cbc:TaxableAmount currencyID="RON">100.00</cbc:TaxableAmount>');
+      expect(subtotals[0]).toContain('<cbc:TaxAmount currencyID="RON">21.00</cbc:TaxAmount>');
+      expect(subtotals[1]).toContain('<cbc:TaxableAmount currencyID="RON">90.00</cbc:TaxableAmount>');
+      expect(subtotals[1]).toContain('<cbc:TaxAmount currencyID="RON">9.90</cbc:TaxAmount>');
+
+      // 21.00 + 9.90 = 30.90 VAT on a 190.00 base.
+      expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="RON">190.00</cbc:TaxExclusiveAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">220.90</cbc:TaxInclusiveAmount>');
+    });
+
+    test('single-rate invoice still infers the percent from its one matching group', () => {
+      // The common case: exactly one 'S' group, so there is nothing to disambiguate and
+      // omitting taxPercent must keep working.
+      const xml = builder.generateInvoiceXml({
+        ...mockTestData.invoiceData,
+        // mockTestData has a single 100 RON line at 19%.
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 20, reason: 'Promo', taxCategoryId: 'S' }],
+      });
+
+      const acBlocks = xml.match(/<cac:AllowanceCharge>[\s\S]*?<\/cac:AllowanceCharge>/g) ?? [];
+      expect(acBlocks).toHaveLength(1);
+      expect(acBlocks[0]).toContain('<cbc:ID>S</cbc:ID>');
+      expect(acBlocks[0]).toContain('<cbc:Percent>19.00</cbc:Percent>');
+
+      const subtotals = taxSubtotalsOf(xml);
+      expect(subtotals).toHaveLength(1);
+      expect(subtotals[0]).toContain('<cbc:TaxableAmount currencyID="RON">80.00</cbc:TaxableAmount>');
+      expect(subtotals[0]).toContain('<cbc:TaxAmount currencyID="RON">15.20</cbc:TaxAmount>');
+      expect(xml).toContain('<cbc:TaxInclusiveAmount currencyID="RON">95.20</cbc:TaxInclusiveAmount>');
+    });
+
+    test("category 'O' is never rate-ambiguous, on either of the two routes that reach it", () => {
+      // Route 1 — non-VAT supplier. Every allowance is coerced to 'O' before any
+      // category/rate matching happens, so even multi-percent 'O' line groups cannot
+      // trigger the ambiguity error.
+      const nonVatSupplier: Party = { ...mockTestData.invoiceData.supplier, vatNumber: undefined };
+      const nonVatInvoice: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        supplier: nonVatSupplier,
+        isSupplierVatPayer: false,
+        lines: [
+          { description: 'Service A', quantity: 1, unitPrice: 100, taxPercent: 0 },
+          { description: 'Service B', quantity: 1, unitPrice: 50, taxPercent: 19 },
+        ],
+        documentAllowanceCharges: [{ chargeIndicator: false, amount: 30, reason: 'Discount', taxCategoryId: 'O' }],
+      };
+
+      expect(() => builder.generateInvoiceXml(nonVatInvoice)).not.toThrow();
+      const nonVatAcBlock = builder
+        .generateInvoiceXml(nonVatInvoice)
+        .match(/<cac:AllowanceCharge>[\s\S]*?<\/cac:AllowanceCharge>/)![0];
+      expect(nonVatAcBlock).toContain('<cbc:ID>O</cbc:ID>');
+      // BR-O-05: 'O' carries no percent, which is exactly why it cannot be ambiguous.
+      expect(nonVatAcBlock).not.toContain('<cbc:Percent>');
+
+      // Route 2 — VAT supplier, mixed rates, explicit 'O' allowance. Unchanged: it still
+      // gets its own subtotal alongside both rated groups.
+      const mixedInvoice: InvoiceInput = {
+        ...mockTestData.invoiceData,
+        lines: twoRateLines,
+        documentAllowanceCharges: [
+          { chargeIndicator: false, amount: 10, reason: 'Non-taxable rebate', taxCategoryId: 'O', taxPercent: 0 },
+        ],
+      };
+
+      expect(() => builder.generateInvoiceXml(mixedInvoice)).not.toThrow();
+      expect(taxSubtotalsOf(builder.generateInvoiceXml(mixedInvoice))).toHaveLength(3);
+    });
+  });
+
   describe('Performance Tests', () => {
     test('should generate XML quickly for simple invoices', () => {
       const start = Date.now();

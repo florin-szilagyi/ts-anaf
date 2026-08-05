@@ -376,13 +376,15 @@ interface ResolvedAllowanceTaxCategory {
  * Resolution order:
  *  1. If both `taxCategoryId` and `taxPercent` are explicit on the allowance, use them.
  *  2. If `taxCategoryId` is explicit but `taxPercent` is missing, infer the percent from
- *     the matching line tax group (or default to 0 for 'Z'/'O', error if 'S' has no match).
+ *     the single matching line tax group (or default to 0 for 'Z'/'O', error if 'S' has
+ *     no match, error if several line groups share the category at different rates).
  *  3. If neither is explicit and the lines have a single tax group, inherit from it.
  *  4. Otherwise (lines have mixed tax groups), throw — caller must disambiguate.
  *
  * @throws {AnafValidationError} If lines have mixed tax categories and the allowance
- *   does not specify `taxCategoryId`, or if an explicit `taxCategoryId` references
- *   a standard-rated ('S') category with no matching line group to infer the percent from.
+ *   does not specify `taxCategoryId`, if an explicit `taxCategoryId` references
+ *   a standard-rated ('S') category with no matching line group to infer the percent from,
+ *   or if it references a category carried by several line groups at different rates.
  */
 function resolveAllowanceTaxCategory(
   ac: DocumentAllowanceCharge,
@@ -405,11 +407,24 @@ function resolveAllowanceTaxCategory(
 
   // Explicit category provided.
   if (ac.taxCategoryId) {
-    const matching = taxGroups.find((g) => g.categoryId === ac.taxCategoryId);
+    const matches = taxGroups.filter((g) => g.categoryId === ac.taxCategoryId);
+    const matching = matches[0];
     let percent: number;
     if (ac.taxPercent !== undefined) {
       percent = ac.taxPercent;
     } else if (matching) {
+      // A category does not identify a tax group on its own: category (BT-118) and rate
+      // (BT-119) are independent, so 'S' can cover several rates. Inheriting the first
+      // match would file VAT at the wrong rate on an invoice whose totals still
+      // reconcile — undetectable downstream — so refuse to guess.
+      const candidatePercents = Array.from(new Set(matches.map((g) => g.percent)));
+      if (ac.taxCategoryId !== 'O' && candidatePercents.length > 1) {
+        throw new AnafValidationError(
+          `${label}: taxPercent is required because invoice lines carry several '${ac.taxCategoryId}' VAT rates ` +
+            `(${candidatePercents.map((p) => `${p}%`).join(', ')}) — category and rate are independent, so ` +
+            `'${ac.taxCategoryId}' alone does not identify a tax group; set taxPercent to the rate this applies to`
+        );
+      }
       percent = matching.percent;
     } else if (ac.taxCategoryId === 'Z') {
       percent = 0;
