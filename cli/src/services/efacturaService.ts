@@ -234,14 +234,26 @@ export class EfacturaService {
 
   /**
    * Download a document and render it as a PDF through the ANAF transform service.
+   *
+   * Both calls share one token manager, so a stored token that needs refreshing
+   * is refreshed once for the pair rather than once per leg.
    */
   async downloadPdf(args: DownloadPdfArgs): Promise<Buffer> {
-    const xml = await this.downloadXml({ downloadId: args.downloadId, clientSecret: args.clientSecret });
-    return this.convertToPdf({
-      clientSecret: args.clientSecret,
-      xml,
-      standard: args.standard,
-      noValidation: args.noValidation,
+    return this.withClientAndTools(args.clientSecret, async (client, tools) => {
+      let xml: string;
+      try {
+        xml = await client.downloadDocumentXml(args.downloadId);
+      } catch (cause) {
+        throw wrapAnafError('DOWNLOAD_FAILED', 'Failed to download document', cause);
+      }
+
+      try {
+        return args.noValidation
+          ? await tools.convertXmlToPdfNoValidation(xml, args.standard ?? 'FACT1')
+          : await tools.convertXmlToPdf(xml, args.standard ?? 'FACT1');
+      } catch (cause) {
+        throw wrapAnafError('PDF_CONVERSION_FAILED', 'Failed to convert XML to PDF', cause);
+      }
     });
   }
 
@@ -380,6 +392,38 @@ export class EfacturaService {
 
     try {
       return await fn(client);
+    } finally {
+      this.persistRotation(tokenManager, originalRefreshToken);
+    }
+  }
+
+  /**
+   * Run an operation that needs both clients within a single token cycle.
+   *
+   * Building the two clients off one token manager keeps an expiring access
+   * token to one refresh (and one rotation) for the whole command.
+   */
+  private async withClientAndTools<T>(
+    clientSecret: string,
+    fn: (client: EfacturaClientLike, tools: EfacturaToolsClientLike) => Promise<T>
+  ): Promise<T> {
+    const { cui, env } = this.resolveActiveCompany();
+    const credential = this.credentialService.get();
+    const authenticator = this.buildAuthenticator(credential.clientId, clientSecret, credential.redirectUri);
+    const { tokenManager, originalRefreshToken } = this.selectTokenManager(authenticator);
+
+    const client = this.clientFactory({
+      vatNumber: cui.replace(/^RO/i, ''),
+      testMode: env === 'test',
+      tokenManager,
+    });
+    const tools = this.toolsFactory({
+      testMode: env === 'test',
+      tokenManager,
+    });
+
+    try {
+      return await fn(client, tools);
     } finally {
       this.persistRotation(tokenManager, originalRefreshToken);
     }

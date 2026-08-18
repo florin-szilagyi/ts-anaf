@@ -18,14 +18,28 @@ const MAX_COMMENT_SIZE = 0xffff;
 const METHOD_STORED = 0;
 const METHOD_DEFLATE = 8;
 
+/** General purpose bit 0: the entry is encrypted. */
+const FLAG_ENCRYPTED = 0x0001;
+
+/** Value a 32-bit ZIP field carries when the real value lives in a ZIP64 record. */
+const ZIP64_MARKER_32 = 0xffffffff;
+/** Value a 16-bit ZIP field carries when the real value lives in a ZIP64 record. */
+const ZIP64_MARKER_16 = 0xffff;
+
 /**
  * Locate the End of Central Directory record by scanning backwards from the
  * end of the buffer (the record is last, but may be followed by a comment).
+ *
+ * The signature alone is not enough: those four bytes can occur inside an
+ * archive comment. A match only counts when its declared comment length
+ * accounts for exactly the remaining bytes.
  */
 function findEndOfCentralDirectory(buffer: Buffer): number {
   const minOffset = Math.max(0, buffer.length - EOCD_MIN_SIZE - MAX_COMMENT_SIZE);
   for (let offset = buffer.length - EOCD_MIN_SIZE; offset >= minOffset; offset--) {
-    if (buffer.readUInt32LE(offset) === EOCD_SIGNATURE) {
+    if (buffer.readUInt32LE(offset) !== EOCD_SIGNATURE) continue;
+    const commentLength = buffer.readUInt16LE(offset + 20);
+    if (offset + EOCD_MIN_SIZE + commentLength === buffer.length) {
       return offset;
     }
   }
@@ -55,8 +69,9 @@ export function readZipEntries(buffer: Buffer): ZipEntry[] {
   }
 
   const entryCount = buffer.readUInt16LE(eocd + 10);
+  const centralDirSize = buffer.readUInt32LE(eocd + 12);
   const centralDirOffset = buffer.readUInt32LE(eocd + 16);
-  if (centralDirOffset === 0xffffffff) {
+  if (centralDirOffset === ZIP64_MARKER_32 || centralDirSize === ZIP64_MARKER_32 || entryCount === ZIP64_MARKER_16) {
     throw new AnafValidationError('Unsupported ZIP archive: ZIP64 format');
   }
 
@@ -68,6 +83,7 @@ export function readZipEntries(buffer: Buffer): ZipEntry[] {
       throw new AnafValidationError('Invalid ZIP archive: corrupt central directory');
     }
 
+    const flags = buffer.readUInt16LE(offset + 8);
     const compressionMethod = buffer.readUInt16LE(offset + 10);
     const compressedSize = buffer.readUInt32LE(offset + 20);
     const uncompressedSize = buffer.readUInt32LE(offset + 24);
@@ -75,13 +91,28 @@ export function readZipEntries(buffer: Buffer): ZipEntry[] {
     const extraLength = buffer.readUInt16LE(offset + 30);
     const commentLength = buffer.readUInt16LE(offset + 32);
     const localHeaderOffset = buffer.readUInt32LE(offset + 42);
-    const name = buffer.subarray(offset + 46, offset + 46 + nameLength).toString('utf8');
 
-    offset += 46 + nameLength + extraLength + commentLength;
+    // subarray() clamps instead of throwing, so an oversized length field would
+    // otherwise yield a silently truncated name rather than a parse failure.
+    const headerEnd = offset + 46 + nameLength + extraLength + commentLength;
+    if (headerEnd > buffer.length) {
+      throw new AnafValidationError('Invalid ZIP archive: corrupt central directory');
+    }
+
+    const name = buffer.subarray(offset + 46, offset + 46 + nameLength).toString('utf8');
+    offset = headerEnd;
 
     // Directory entries carry no payload.
     if (name.endsWith('/')) {
       continue;
+    }
+
+    if ((flags & FLAG_ENCRYPTED) !== 0) {
+      throw new AnafValidationError(`Unsupported ZIP archive: "${name}" is encrypted`);
+    }
+
+    if (compressedSize === ZIP64_MARKER_32 || uncompressedSize === ZIP64_MARKER_32) {
+      throw new AnafValidationError('Unsupported ZIP archive: ZIP64 format');
     }
 
     if (localHeaderOffset + 30 > buffer.length || buffer.readUInt32LE(localHeaderOffset) !== LOCAL_HEADER_SIGNATURE) {
@@ -126,12 +157,18 @@ export function readZipEntries(buffer: Buffer): ZipEntry[] {
   return entries;
 }
 
+/** Root elements of the documents e-Factura archives carry. */
+const INVOICE_ROOT_ELEMENTS = ['Invoice', 'CreditNote'];
+
 /**
  * Extract the invoice XML from an e-Factura download archive.
  *
  * ANAF returns a ZIP containing the invoice XML plus a detached signature
- * (`semnatura_*.xml`). This picks the invoice document and returns it as a
- * UTF-8 string with any byte order mark stripped.
+ * (`semnatura_*.xml`), and can add further documents alongside them. Selection
+ * is therefore by content — the entry whose root element is `Invoice` or
+ * `CreditNote` wins — falling back to the first non-signature XML when no
+ * entry declares a recognised root. The result is decoded as UTF-8 with any
+ * byte order mark stripped.
  *
  * @param zipBuffer - The archive returned by `EfacturaClient.downloadDocument`
  * @returns The invoice XML document
@@ -147,9 +184,34 @@ export function extractInvoiceXml(zipBuffer: Buffer): string {
     );
   }
 
-  const invoice = xmlEntries.find((e) => !basename(e.name).toLowerCase().startsWith('semnatura')) ?? xmlEntries[0];
+  const candidates = xmlEntries.map((entry) => ({ entry, text: decodeXml(entry.data) }));
+  const byRootElement = candidates.find((c) => INVOICE_ROOT_ELEMENTS.includes(rootElementName(c.text)));
+  if (byRootElement) {
+    return byRootElement.text;
+  }
 
-  return invoice.data.toString('utf8').replace(/^\uFEFF/, '');
+  const nonSignature = candidates.find((c) => !basename(c.entry.name).toLowerCase().startsWith('semnatura'));
+  return (nonSignature ?? candidates[0]).text;
+}
+
+function decodeXml(data: Buffer): string {
+  return data.toString('utf8').replace(/^\uFEFF/, '');
+}
+
+/**
+ * Read the local name of a document's root element, ignoring any namespace
+ * prefix, XML declaration, comments and processing instructions.
+ */
+function rootElementName(xml: string): string {
+  const match = /<(?!\?|!)([^\s/>]+)/.exec(stripXmlComments(xml));
+  if (!match) return '';
+  const [, tag] = match;
+  const colon = tag.lastIndexOf(':');
+  return colon === -1 ? tag : tag.slice(colon + 1);
+}
+
+function stripXmlComments(xml: string): string {
+  return xml.replace(/<!--[\s\S]*?-->/g, '');
 }
 
 function basename(name: string): string {

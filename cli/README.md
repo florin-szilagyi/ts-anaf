@@ -175,6 +175,8 @@ anaf-cli efactura download --download-id 67890 --as pdf --out invoice.pdf
 
 `--as pdf` renders the downloaded invoice through the ANAF transform service; it
 accepts the same `--standard FACT1|FCN` and `--no-validation` flags as `efactura pdf`.
+Those two flags are rejected with any other `--as` value, so a mistyped format never
+passes silently.
 
 **Messages:**
 

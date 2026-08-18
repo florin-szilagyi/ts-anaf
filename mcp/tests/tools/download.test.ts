@@ -29,6 +29,23 @@ describe('handleDownloadInvoice', () => {
     }
   });
 
+  it('reports a local write failure as WRITE_FAILED', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-mcp-dl-'));
+    try {
+      const mockClient = {
+        downloadDocument: jest.fn<() => Promise<Buffer>>().mockResolvedValue(Buffer.from('zip')),
+      };
+      const result = await handleDownloadInvoice(
+        { download_id: 'dl-1', output_path: tmpDir },
+        { efactura: mockClient as any }
+      );
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('WRITE_FAILED');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it('wraps SDK errors', async () => {
     const mockClient = {
       downloadDocument: jest.fn<() => Promise<never>>().mockRejectedValue(new Error('404')),
@@ -116,6 +133,44 @@ describe('handleDownloadInvoicePdf', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/DOWNLOAD_PDF_FAILED|no such invoice/);
     expect(mockTools.convertXmlToPdf).not.toHaveBeenCalled();
+  });
+
+  it('reports a local write failure as WRITE_FAILED, not as an ANAF failure', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-mcp-pdf-'));
+    try {
+      const mockClient = {
+        downloadDocumentXml: jest.fn<() => Promise<string>>().mockResolvedValue('<Invoice/>'),
+      };
+      const mockTools = {
+        convertXmlToPdf: jest.fn<() => Promise<Buffer>>().mockResolvedValue(Buffer.from('%PDF-1.4')),
+        convertXmlToPdfNoValidation: jest.fn<() => Promise<Buffer>>(),
+      };
+
+      // A directory is not a writable target for the PDF.
+      const result = await handleDownloadInvoicePdf(
+        { download_id: 'dl-42', output_path: tmpDir },
+        { efactura: mockClient as any, tools: mockTools as any }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('WRITE_FAILED');
+      expect(result.content[0].text).not.toContain('DOWNLOAD_PDF_FAILED');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports invalid input as INVALID_INPUT when called directly', async () => {
+    const result = await handleDownloadInvoicePdf({ download_id: '', output_path: '' } as any, {
+      efactura: { downloadDocumentXml: jest.fn<() => Promise<string>>() } as any,
+      tools: {
+        convertXmlToPdf: jest.fn<() => Promise<Buffer>>(),
+        convertXmlToPdfNoValidation: jest.fn<() => Promise<Buffer>>(),
+      } as any,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('INVALID_INPUT');
   });
 
   it('wraps conversion errors', async () => {

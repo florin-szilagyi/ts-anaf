@@ -5,6 +5,35 @@ import type { EfacturaClient, EfacturaToolsClient } from '@florinszilagyi/anaf-t
 import { McpToolError, formatToolError } from '../errors.js';
 import type { ToolResult } from './types.js';
 
+/**
+ * Write bytes to `outputPath`, reporting a local filesystem failure as such
+ * instead of folding it into whatever ANAF call preceded it.
+ */
+function writeOutput(outputPath: string, bytes: Buffer): string {
+  const abs = path.resolve(outputPath);
+  try {
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, bytes);
+  } catch (err) {
+    throw new McpToolError({
+      code: 'WRITE_FAILED',
+      message: `Could not write to output_path "${abs}": ${err instanceof Error ? err.message : String(err)}`,
+      category: 'user_input',
+    });
+  }
+  return abs;
+}
+
+/** Wrap a non-McpToolError as `code`; errors already typed are passed through. */
+function asToolError(err: unknown, code: string): McpToolError {
+  if (err instanceof McpToolError) return err;
+  return new McpToolError({
+    code,
+    message: err instanceof Error ? err.message : String(err),
+    category: 'anaf_api',
+  });
+}
+
 export const downloadInvoiceInputSchema = z.object({
   download_id: z.string().min(1).describe('The idDescarcare returned from anaf_invoice_status (when stare=ok)'),
   output_path: z.string().min(1).describe('Absolute or relative path where the ZIP file should be written'),
@@ -19,9 +48,7 @@ export interface DownloadDeps {
 export async function handleDownloadInvoice(input: DownloadInvoiceInput, deps: DownloadDeps): Promise<ToolResult> {
   try {
     const buf = await deps.efactura.downloadDocument(input.download_id);
-    const abs = path.resolve(input.output_path);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, buf);
+    const abs = writeOutput(input.output_path, buf);
     return {
       content: [
         {
@@ -31,13 +58,8 @@ export async function handleDownloadInvoice(input: DownloadInvoiceInput, deps: D
       ],
     };
   } catch (err) {
-    const wrapped = new McpToolError({
-      code: 'DOWNLOAD_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-      category: 'anaf_api',
-    });
     return {
-      content: [{ type: 'text', text: formatToolError(wrapped) }],
+      content: [{ type: 'text', text: formatToolError(asToolError(err, 'DOWNLOAD_FAILED')) }],
       isError: true,
     };
   }
@@ -77,15 +99,13 @@ export async function handleDownloadInvoicePdf(
   deps: DownloadPdfDeps
 ): Promise<ToolResult> {
   try {
-    const parsed = downloadInvoicePdfInputSchema.parse(input);
+    const parsed = parseInput(input);
     const xml = await deps.efactura.downloadDocumentXml(parsed.download_id);
     const pdf = parsed.no_validation
       ? await deps.tools.convertXmlToPdfNoValidation(xml, parsed.standard)
       : await deps.tools.convertXmlToPdf(xml, parsed.standard);
 
-    const abs = path.resolve(parsed.output_path);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, pdf);
+    const abs = writeOutput(parsed.output_path, pdf);
     return {
       content: [
         {
@@ -99,16 +119,24 @@ export async function handleDownloadInvoicePdf(
       ],
     };
   } catch (err) {
-    const wrapped = new McpToolError({
-      code: 'DOWNLOAD_PDF_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-      category: 'anaf_api',
-    });
     return {
-      content: [{ type: 'text', text: formatToolError(wrapped) }],
+      content: [{ type: 'text', text: formatToolError(asToolError(err, 'DOWNLOAD_PDF_FAILED')) }],
       isError: true,
     };
   }
+}
+
+/** Re-validate defensively: the handler is exported and callable on its own. */
+function parseInput(input: DownloadInvoicePdfInput): z.infer<typeof downloadInvoicePdfInputSchema> {
+  const result = downloadInvoicePdfInputSchema.safeParse(input);
+  if (!result.success) {
+    throw new McpToolError({
+      code: 'INVALID_INPUT',
+      message: result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; '),
+      category: 'user_input',
+    });
+  }
+  return result.data;
 }
 
 export const DOWNLOAD_INVOICE_PDF_TOOL_DEFINITION = {

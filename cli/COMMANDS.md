@@ -319,9 +319,9 @@ PDF)
 Options:
   --download-id <id>     ANAF download id
   --as <fmt>             download as: zip (default) | xml | pdf
-  --standard <std>       PDF rendering standard (FACT1|FCN), used with --as pdf
-  --no-validation        use the no-validation PDF conversion endpoint, used
-                         with --as pdf
+  --standard <std>       PDF rendering standard (FACT1|FCN); requires --as pdf
+  --no-validation        use the no-validation PDF conversion endpoint;
+                         requires --as pdf
   --out <path>           output file path
   --client-secret-stdin  read OAuth client secret from stdin
   -v, --version          print the CLI version

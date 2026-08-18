@@ -6,6 +6,14 @@ export interface ZipInput {
   content: string | Buffer;
   /** 0 = stored, 8 = deflate. Defaults to deflate. */
   method?: 0 | 8;
+  /** General purpose bit flag, e.g. 0x0001 to mark the entry encrypted. */
+  flags?: number;
+}
+
+/** Options for the archive as a whole. */
+export interface ZipOptions {
+  /** Trailing archive comment, recorded in the EOCD comment length. */
+  comment?: string;
 }
 
 /**
@@ -13,13 +21,14 @@ export interface ZipInput {
  * returns, so the reader can be exercised without checking binary fixtures
  * into git.
  */
-export function buildZip(files: ZipInput[]): Buffer {
+export function buildZip(files: ZipInput[], options: ZipOptions = {}): Buffer {
   const localChunks: Buffer[] = [];
   const centralChunks: Buffer[] = [];
   let offset = 0;
 
   for (const file of files) {
     const method = file.method ?? 8;
+    const flags = file.flags ?? 0;
     const nameBytes = Buffer.from(file.name, 'utf8');
     const raw = Buffer.isBuffer(file.content) ? file.content : Buffer.from(file.content, 'utf8');
     const compressed = method === 0 ? raw : deflateRawSync(raw);
@@ -27,7 +36,7 @@ export function buildZip(files: ZipInput[]): Buffer {
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(20, 4); // version needed
-    local.writeUInt16LE(0, 6); // flags
+    local.writeUInt16LE(flags, 6);
     local.writeUInt16LE(method, 8);
     local.writeUInt16LE(0, 10); // mod time
     local.writeUInt16LE(0, 12); // mod date
@@ -42,7 +51,7 @@ export function buildZip(files: ZipInput[]): Buffer {
     central.writeUInt32LE(0x02014b50, 0);
     central.writeUInt16LE(20, 4); // version made by
     central.writeUInt16LE(20, 6); // version needed
-    central.writeUInt16LE(0, 8); // flags
+    central.writeUInt16LE(flags, 8);
     central.writeUInt16LE(method, 10);
     central.writeUInt16LE(0, 12);
     central.writeUInt16LE(0, 14);
@@ -64,6 +73,7 @@ export function buildZip(files: ZipInput[]): Buffer {
   const localBuf = Buffer.concat(localChunks);
   const centralBuf = Buffer.concat(centralChunks);
 
+  const comment = Buffer.from(options.comment ?? '', 'utf8');
   const eocd = Buffer.alloc(22);
   eocd.writeUInt32LE(0x06054b50, 0);
   eocd.writeUInt16LE(0, 4); // disk number
@@ -72,7 +82,7 @@ export function buildZip(files: ZipInput[]): Buffer {
   eocd.writeUInt16LE(files.length, 10);
   eocd.writeUInt32LE(centralBuf.length, 12);
   eocd.writeUInt32LE(localBuf.length, 16);
-  eocd.writeUInt16LE(0, 20); // comment length
+  eocd.writeUInt16LE(comment.length, 20);
 
-  return Buffer.concat([localBuf, centralBuf, eocd]);
+  return Buffer.concat([localBuf, centralBuf, eocd, comment]);
 }

@@ -520,6 +520,42 @@ describe('EfacturaService.downloadPdf', () => {
     expect(err).toBeInstanceOf(CliError);
     expect((err as CliError).code).toBe('PDF_CONVERSION_FAILED');
   });
+
+  it('wraps download failure as DOWNLOAD_FAILED without attempting conversion', async () => {
+    const h = harness();
+    setupState(h);
+    h.fakeClient.downloadDocumentXml.mockRejectedValueOnce(new Error('gone'));
+    let err: unknown;
+    try {
+      await h.service.downloadPdf({ downloadId: 'download-1', clientSecret: 's' });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).code).toBe('DOWNLOAD_FAILED');
+    expect(h.fakeTools.convertXmlToPdf).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the token once for the whole command, not once per leg', async () => {
+    // Both legs share one token manager: an expiring token costs one refresh
+    // and one rotation, not two.
+    let factoryCalls = 0;
+    const h = harness({
+      tokenManagerFactory: ({ refreshToken }) => {
+        factoryCalls += 1;
+        const tm = new FakeTokenManager(refreshToken);
+        tm.rotate = true;
+        void tm.getValidAccessToken(); // the stub clients never ask, so rotate here
+        return tm;
+      },
+    });
+    setupState(h);
+
+    await h.service.downloadPdf({ downloadId: 'download-1', clientSecret: 's' });
+
+    expect(factoryCalls).toBe(1);
+    expect(h.tokenStore.read('_default')?.refreshToken).toBe('rt-rotated');
+  });
 });
 
 describe('EfacturaService.getMessages', () => {
