@@ -55,6 +55,10 @@ export * from './errors';
 // UBL Builder
 export * from './ubl';
 
+// ZIP utilities (e-Factura downloads are ZIP archives)
+export { readZipEntries, extractInvoiceXml } from './utils/zipReader';
+export type { ZipEntry } from './utils/zipReader';
+
 // Message utilities
 export { parseDetalii } from './utils/messageParser';
 export { enrichMessagesWithCompanyData } from './utils/messageEnricher';

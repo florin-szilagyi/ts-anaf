@@ -15,7 +15,7 @@ describe('MCP server smoke test', () => {
     }
   });
 
-  it('lists all 10 tools in response to tools/list', async () => {
+  it('lists all 11 tools in response to tools/list', async () => {
     const child = spawn('node', [SERVER_PATH], {
       env: {
         ...process.env,
@@ -50,6 +50,7 @@ describe('MCP server smoke test', () => {
     expect(output).toContain('anaf_upload_invoice');
     expect(output).toContain('anaf_invoice_status');
     expect(output).toContain('anaf_download_invoice');
+    expect(output).toContain('anaf_download_invoice_pdf');
     expect(output).toContain('anaf_list_messages');
   }, 10000);
 });

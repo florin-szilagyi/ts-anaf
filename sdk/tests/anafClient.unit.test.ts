@@ -3,6 +3,7 @@ import { AnafValidationError, AnafApiError, AnafAuthenticationError } from '../s
 import { UploadOptions, PaginatedMessagesParams, ListMessagesParams, MessageFilter } from '../src/types';
 import { AnafAuthenticator } from '../src/AnafAuthenticator';
 import { mockTestData } from './testUtils';
+import { buildZip } from './zipFixtures';
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -349,6 +350,41 @@ describe('AnafEfacturaClient Unit Tests', () => {
 
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(result.toString('utf8')).toBe(mockDownloadContent);
+    });
+
+    test('should unwrap the invoice XML from the downloaded archive', async () => {
+      const invoiceXml = '<?xml version="1.0" encoding="UTF-8"?><Invoice><ID>FCT-1</ID></Invoice>';
+      const zipBytes = buildZip([
+        { name: 'semnatura_4013735587.xml', content: '<Signature/>' },
+        { name: '4013735587.xml', content: invoiceXml },
+      ]);
+      (fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => (name === 'content-type' ? 'application/zip' : null),
+        },
+        arrayBuffer: () =>
+          Promise.resolve(zipBytes.buffer.slice(zipBytes.byteOffset, zipBytes.byteOffset + zipBytes.byteLength)),
+      });
+
+      const result = await client.downloadDocumentXml(mockDownloadId);
+
+      expect(result).toBe(invoiceXml);
+    });
+
+    test('should reject a downloaded archive that is not a ZIP', async () => {
+      const bytes = Buffer.from('ANAF returned an error page');
+      (fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => (name === 'content-type' ? 'application/zip' : null),
+        },
+        arrayBuffer: () => Promise.resolve(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
+      });
+
+      await expect(client.downloadDocumentXml(mockDownloadId)).rejects.toThrow(AnafValidationError);
     });
 
     test('should download with application/octet-stream content-type', async () => {

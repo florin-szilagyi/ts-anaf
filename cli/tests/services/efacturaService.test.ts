@@ -57,6 +57,7 @@ class FakeEfacturaClient {
     })
   );
   downloadDocument = jest.fn(async (): Promise<Buffer> => Buffer.from('fake-zip'));
+  downloadDocumentXml = jest.fn(async (): Promise<string> => '<Invoice><ID>FCT-1</ID></Invoice>');
   getMessages = jest.fn(async (): Promise<ListMessagesResponse> => ({ mesaje: [] }) as unknown as ListMessagesResponse);
   getMessagesPaginated = jest.fn(
     async (): Promise<PaginatedListMessagesResponse> => ({ mesaje: [] }) as unknown as PaginatedListMessagesResponse
@@ -454,6 +455,70 @@ describe('EfacturaService.download', () => {
     }
     expect(err).toBeInstanceOf(CliError);
     expect((err as CliError).code).toBe('DOWNLOAD_FAILED');
+  });
+});
+
+describe('EfacturaService.downloadXml', () => {
+  it('returns the invoice XML unwrapped by the SDK client', async () => {
+    const h = harness();
+    setupState(h);
+    const xml = await h.service.downloadXml({ downloadId: 'download-1', clientSecret: 's' });
+    expect(h.fakeClient.downloadDocumentXml).toHaveBeenCalledWith('download-1');
+    expect(xml).toBe('<Invoice><ID>FCT-1</ID></Invoice>');
+  });
+
+  it('wraps SDK failure as DOWNLOAD_FAILED', async () => {
+    const h = harness();
+    setupState(h);
+    h.fakeClient.downloadDocumentXml.mockRejectedValueOnce(new Error('bad archive'));
+    let err: unknown;
+    try {
+      await h.service.downloadXml({ downloadId: 'download-1', clientSecret: 's' });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).code).toBe('DOWNLOAD_FAILED');
+  });
+});
+
+describe('EfacturaService.downloadPdf', () => {
+  it('downloads the XML and renders it through the transform service', async () => {
+    const h = harness();
+    setupState(h);
+    const pdf = await h.service.downloadPdf({ downloadId: 'download-1', clientSecret: 's' });
+    expect(h.fakeClient.downloadDocumentXml).toHaveBeenCalledWith('download-1');
+    expect(h.fakeTools.convertXmlToPdf).toHaveBeenCalledWith('<Invoice><ID>FCT-1</ID></Invoice>', 'FACT1');
+    expect(h.fakeTools.convertXmlToPdfNoValidation).not.toHaveBeenCalled();
+    expect(pdf.toString('utf8')).toBe('%PDF-1.4');
+  });
+
+  it('uses the no-validation endpoint and the requested standard', async () => {
+    const h = harness();
+    setupState(h);
+    const pdf = await h.service.downloadPdf({
+      downloadId: 'download-1',
+      clientSecret: 's',
+      standard: 'FCN',
+      noValidation: true,
+    });
+    expect(h.fakeTools.convertXmlToPdfNoValidation).toHaveBeenCalledWith('<Invoice><ID>FCT-1</ID></Invoice>', 'FCN');
+    expect(h.fakeTools.convertXmlToPdf).not.toHaveBeenCalled();
+    expect(pdf.toString('utf8')).toBe('%PDF-1.4-noval');
+  });
+
+  it('wraps conversion failure as PDF_CONVERSION_FAILED', async () => {
+    const h = harness();
+    setupState(h);
+    h.fakeTools.convertXmlToPdf.mockRejectedValueOnce(new Error('transform refused'));
+    let err: unknown;
+    try {
+      await h.service.downloadPdf({ downloadId: 'download-1', clientSecret: 's' });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).code).toBe('PDF_CONVERSION_FAILED');
   });
 });
 

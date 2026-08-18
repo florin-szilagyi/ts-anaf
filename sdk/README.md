@@ -65,9 +65,15 @@ const uploadResult = await client.uploadDocument(tokens.access_token, xmlContent
 // Check upload status
 const status = await client.getUploadStatus(tokens.access_token, uploadResult.index_incarcare);
 
-// Download processed document
+// Download processed document (ZIP archive: invoice + detached signature)
 if (status.id_descarcare) {
   const result = await client.downloadDocument(tokens.access_token, status.id_descarcare);
+
+  // Or unwrap the archive and get the invoice XML directly
+  const invoiceXml = await client.downloadDocumentXml(status.id_descarcare);
+
+  // …which is what you need to render the invoice as a PDF
+  const pdf = await client.convertXmlToPdf(invoiceXml, 'FACT1');
 }
 
 // List recent messages

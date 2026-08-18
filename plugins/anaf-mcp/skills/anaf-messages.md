@@ -34,7 +34,8 @@ Call `anaf_list_messages` with:
 
 ## Downloading a received invoice
 
-If you see a message with an `id`, call `anaf_download_invoice` with that ID to get the signed ZIP.
+If you see a message with an `id`, call `anaf_download_invoice` with that ID to get the signed ZIP,
+or `anaf_download_invoice_pdf` to save the same invoice rendered as a PDF.
 
 ## Checking a specific upload
 

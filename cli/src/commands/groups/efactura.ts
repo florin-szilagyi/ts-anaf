@@ -45,6 +45,9 @@ interface StatusCmdOpts {
 interface DownloadCmdOpts {
   downloadId?: string;
   out?: string;
+  as?: string;
+  standard?: 'FACT1' | 'FCN';
+  validation?: boolean;
   clientSecretStdin?: boolean;
 }
 
@@ -207,6 +210,20 @@ export async function efacturaStatus(deps: CommandDeps, opts: StatusCmdOpts): Pr
   );
 }
 
+const DOWNLOAD_FORMATS = ['zip', 'xml', 'pdf'] as const;
+type DownloadFormat = (typeof DOWNLOAD_FORMATS)[number];
+
+function resolveDownloadFormat(raw?: string): DownloadFormat {
+  if (!raw) return 'zip';
+  const value = raw.toLowerCase();
+  if ((DOWNLOAD_FORMATS as readonly string[]).includes(value)) return value as DownloadFormat;
+  throw new CliError({
+    code: 'BAD_USAGE',
+    message: `Invalid --as "${raw}". Use: ${DOWNLOAD_FORMATS.join(', ')}.`,
+    category: 'user_input',
+  });
+}
+
 export async function efacturaDownload(deps: CommandDeps, opts: DownloadCmdOpts): Promise<void> {
   if (!opts.downloadId) {
     throw new CliError({
@@ -215,7 +232,29 @@ export async function efacturaDownload(deps: CommandDeps, opts: DownloadCmdOpts)
       category: 'user_input',
     });
   }
+  const format = resolveDownloadFormat(opts.as);
   const clientSecret = await resolveClientSecret(deps, opts);
+
+  if (format === 'pdf') {
+    const pdf = await deps.services.efacturaService.downloadPdf({
+      downloadId: opts.downloadId,
+      clientSecret,
+      standard: opts.standard ?? 'FACT1',
+      noValidation: opts.validation === false,
+    });
+    writeBinary(deps.output, pdf, { path: opts.out });
+    return;
+  }
+
+  if (format === 'xml') {
+    const xml = await deps.services.efacturaService.downloadXml({
+      downloadId: opts.downloadId,
+      clientSecret,
+    });
+    writeBinary(deps.output, Buffer.from(xml, 'utf8'), { path: opts.out });
+    return;
+  }
+
   const bytes = await deps.services.efacturaService.download({
     downloadId: opts.downloadId,
     clientSecret,
@@ -388,8 +427,11 @@ export function registerEfactura(parent: Command, deps: CommandDeps): void {
 
   efactura
     .command('download')
-    .description('Download an e-Factura document by id')
+    .description('Download an e-Factura document by id (ZIP archive, invoice XML, or rendered PDF)')
     .option('--download-id <id>', 'ANAF download id')
+    .option('--as <fmt>', 'download as: zip (default) | xml | pdf')
+    .option('--standard <std>', 'PDF rendering standard (FACT1|FCN), used with --as pdf')
+    .option('--no-validation', 'use the no-validation PDF conversion endpoint, used with --as pdf')
     .option('--out <path>', 'output file path')
     .option('--client-secret-stdin', 'read OAuth client secret from stdin')
     .action((opts: DownloadCmdOpts) => efacturaDownload(deps, opts));

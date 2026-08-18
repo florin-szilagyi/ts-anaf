@@ -2,7 +2,7 @@ import { describe, it, expect, jest } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { handleDownloadInvoice } from '../../src/tools/download.js';
+import { handleDownloadInvoice, handleDownloadInvoicePdf } from '../../src/tools/download.js';
 
 describe('handleDownloadInvoice', () => {
   it('writes ZIP bytes to the given output_path and returns metadata', async () => {
@@ -39,5 +39,107 @@ describe('handleDownloadInvoice', () => {
     );
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/DOWNLOAD_FAILED|404/);
+  });
+});
+
+describe('handleDownloadInvoicePdf', () => {
+  it('renders the downloaded invoice XML to a PDF at output_path', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-mcp-pdf-'));
+    const outPath = path.join(tmpDir, 'nested', 'invoice.pdf');
+    try {
+      const pdf = Buffer.from('%PDF-1.4 fake');
+      const mockClient = {
+        downloadDocumentXml: jest.fn<() => Promise<string>>().mockResolvedValue('<Invoice/>'),
+      };
+      const mockTools = {
+        convertXmlToPdf: jest.fn<() => Promise<Buffer>>().mockResolvedValue(pdf),
+        convertXmlToPdfNoValidation: jest.fn<() => Promise<Buffer>>().mockResolvedValue(Buffer.from('nope')),
+      };
+
+      const result = await handleDownloadInvoicePdf(
+        { download_id: 'dl-42', output_path: outPath },
+        { efactura: mockClient as any, tools: mockTools as any }
+      );
+
+      expect(mockClient.downloadDocumentXml).toHaveBeenCalledWith('dl-42');
+      expect(mockTools.convertXmlToPdf).toHaveBeenCalledWith('<Invoice/>', 'FACT1');
+      expect(mockTools.convertXmlToPdfNoValidation).not.toHaveBeenCalled();
+      expect(result.isError).toBeFalsy();
+      expect(fs.readFileSync(outPath).equals(pdf)).toBe(true);
+      expect(result.content[0].text).toContain(outPath);
+      expect(result.content[0].text).toContain('FACT1');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('honours standard and no_validation', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-mcp-pdf-'));
+    const outPath = path.join(tmpDir, 'credit-note.pdf');
+    try {
+      const mockClient = {
+        downloadDocumentXml: jest.fn<() => Promise<string>>().mockResolvedValue('<CreditNote/>'),
+      };
+      const mockTools = {
+        convertXmlToPdf: jest.fn<() => Promise<Buffer>>().mockResolvedValue(Buffer.from('nope')),
+        convertXmlToPdfNoValidation: jest.fn<() => Promise<Buffer>>().mockResolvedValue(Buffer.from('%PDF-1.4 cn')),
+      };
+
+      const result = await handleDownloadInvoicePdf(
+        { download_id: 'dl-7', output_path: outPath, standard: 'FCN', no_validation: true },
+        { efactura: mockClient as any, tools: mockTools as any }
+      );
+
+      expect(mockTools.convertXmlToPdfNoValidation).toHaveBeenCalledWith('<CreditNote/>', 'FCN');
+      expect(mockTools.convertXmlToPdf).not.toHaveBeenCalled();
+      expect(result.isError).toBeFalsy();
+      expect(fs.readFileSync(outPath).toString('utf8')).toBe('%PDF-1.4 cn');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('wraps download errors', async () => {
+    const mockClient = {
+      downloadDocumentXml: jest.fn<() => Promise<never>>().mockRejectedValue(new Error('no such invoice')),
+    };
+    const mockTools = {
+      convertXmlToPdf: jest.fn<() => Promise<Buffer>>(),
+      convertXmlToPdfNoValidation: jest.fn<() => Promise<Buffer>>(),
+    };
+
+    const result = await handleDownloadInvoicePdf(
+      { download_id: 'bogus', output_path: '/tmp/should-not-exist.pdf' },
+      { efactura: mockClient as any, tools: mockTools as any }
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/DOWNLOAD_PDF_FAILED|no such invoice/);
+    expect(mockTools.convertXmlToPdf).not.toHaveBeenCalled();
+  });
+
+  it('wraps conversion errors', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-mcp-pdf-'));
+    const outPath = path.join(tmpDir, 'invoice.pdf');
+    try {
+      const mockClient = {
+        downloadDocumentXml: jest.fn<() => Promise<string>>().mockResolvedValue('<Invoice/>'),
+      };
+      const mockTools = {
+        convertXmlToPdf: jest.fn<() => Promise<never>>().mockRejectedValue(new Error('transform refused')),
+        convertXmlToPdfNoValidation: jest.fn<() => Promise<Buffer>>(),
+      };
+
+      const result = await handleDownloadInvoicePdf(
+        { download_id: 'dl-42', output_path: outPath },
+        { efactura: mockClient as any, tools: mockTools as any }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/DOWNLOAD_PDF_FAILED|transform refused/);
+      expect(fs.existsSync(outPath)).toBe(false);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

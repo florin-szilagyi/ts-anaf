@@ -40,6 +40,7 @@ export interface EfacturaClientLike {
   uploadB2CDocument(xml: string, options?: UploadOptions): Promise<UploadResponse>;
   getUploadStatus(uploadId: string): Promise<StatusResponse>;
   downloadDocument(downloadId: string): Promise<Buffer>;
+  downloadDocumentXml(downloadId: string): Promise<string>;
   getMessages(params: { zile: number; filtru?: MessageFilter }): Promise<ListMessagesResponse>;
   getMessagesPaginated(params: {
     startTime: number;
@@ -93,6 +94,11 @@ export interface StatusArgs {
 export interface DownloadArgs {
   downloadId: string;
   clientSecret: string;
+}
+
+export interface DownloadPdfArgs extends DownloadArgs {
+  standard?: 'FACT1' | 'FCN';
+  noValidation?: boolean;
 }
 
 export interface MessagesArgs {
@@ -210,6 +216,32 @@ export class EfacturaService {
       } catch (cause) {
         throw wrapAnafError('DOWNLOAD_FAILED', 'Failed to download document', cause);
       }
+    });
+  }
+
+  /**
+   * Download a document and return the invoice XML unwrapped from ANAF's ZIP.
+   */
+  async downloadXml(args: DownloadArgs): Promise<string> {
+    return this.withClient(args.clientSecret, async (client) => {
+      try {
+        return await client.downloadDocumentXml(args.downloadId);
+      } catch (cause) {
+        throw wrapAnafError('DOWNLOAD_FAILED', 'Failed to download document', cause);
+      }
+    });
+  }
+
+  /**
+   * Download a document and render it as a PDF through the ANAF transform service.
+   */
+  async downloadPdf(args: DownloadPdfArgs): Promise<Buffer> {
+    const xml = await this.downloadXml({ downloadId: args.downloadId, clientSecret: args.clientSecret });
+    return this.convertToPdf({
+      clientSecret: args.clientSecret,
+      xml,
+      standard: args.standard,
+      noValidation: args.noValidation,
     });
   }
 

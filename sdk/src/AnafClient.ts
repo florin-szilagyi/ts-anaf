@@ -91,6 +91,10 @@ export class AnafEfacturaClient {
     return this.efacturaClient.downloadDocument(downloadId);
   }
 
+  public downloadDocumentXml(downloadId: string): Promise<string> {
+    return this.efacturaClient.downloadDocumentXml(downloadId);
+  }
+
   public getMessagesPaginated(params: PaginatedMessagesParams): Promise<PaginatedListMessagesResponse> {
     return this.efacturaClient.getMessagesPaginated(params);
   }

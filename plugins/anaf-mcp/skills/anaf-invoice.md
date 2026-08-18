@@ -66,6 +66,9 @@ Call `anaf_invoice_status` with the upload index. Retry every 30-60 seconds unti
 
 Call `anaf_download_invoice` with the upload index to get the signed ZIP archive from ANAF.
 
+For a human-readable copy, call `anaf_download_invoice_pdf` instead — it unwraps the archive
+and writes the invoice rendered as a PDF (pass `standard: "FCN"` for credit notes).
+
 ## Common invoice patterns
 
 **B2B (business to business):** Default. Buyer CUI required.

@@ -37,6 +37,7 @@ import {
   extractErrorMessage,
 } from './utils/xmlParser';
 import { isValidDaysParameter } from './utils/dateUtils';
+import { extractInvoiceXml } from './utils/zipReader';
 import { HttpClient } from './utils/httpClient';
 import { handleApiError } from './utils/errorHandler';
 import { tryCatch } from './tryCatch';
@@ -196,6 +197,20 @@ export class EfacturaClient {
     }
 
     return data;
+  }
+
+  /**
+   * Download a document and return the invoice XML it contains.
+   *
+   * ANAF serves downloads as a ZIP holding the invoice plus a detached
+   * signature; this unwraps the archive and returns the invoice document.
+   *
+   * @param downloadId - The `idDescarcare` from a status response or message list
+   * @returns The invoice XML as a UTF-8 string
+   */
+  async downloadDocumentXml(downloadId: string): Promise<string> {
+    const archive = await this.downloadDocument(downloadId);
+    return extractInvoiceXml(archive);
   }
 
   // ==========================================================================
