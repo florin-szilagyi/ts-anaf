@@ -85,6 +85,29 @@ describe('readZipEntries', () => {
     expect(() => readZipEntries(zip)).toThrow(/corrupt central directory/);
   });
 
+  it('rejects an unsupported compression method', () => {
+    const zip = buildZip([{ name: '1.xml', content: INVOICE_XML, method: 12 }]); // 12 = bzip2
+
+    expect(() => readZipEntries(zip)).toThrow(/Unsupported ZIP compression method 12/);
+  });
+
+  it('rejects a central directory that overruns its declared size', () => {
+    const zip = buildZip([{ name: '1.xml', content: INVOICE_XML }]);
+    const eocd = zip.length - 22;
+    zip.writeUInt32LE(zip.readUInt32LE(eocd + 12) - 1, eocd + 12); // shrink declared size
+
+    expect(() => readZipEntries(zip)).toThrow(/corrupt central directory/);
+  });
+
+  it('rejects a deflate entry that declares more than the size ceiling', () => {
+    const zip = buildZip([{ name: '1.xml', content: INVOICE_XML }]);
+    const eocd = zip.length - 22;
+    const centralDirOffset = zip.readUInt32LE(eocd + 16);
+    zip.writeUInt32LE(0x7fffffff, centralDirOffset + 24); // uncompressed size
+
+    expect(() => readZipEntries(zip)).toThrow(/exceeds the \d+-byte limit/);
+  });
+
   it('rejects a truncated archive', () => {
     const zip = buildZip([{ name: 'a.xml', content: INVOICE_XML }]);
     const truncated = Buffer.concat([Buffer.alloc(0), zip.subarray(10)]);

@@ -34,8 +34,18 @@ Call `anaf_list_messages` with:
 
 ## Downloading a received invoice
 
-If you see a message with an `id`, call `anaf_download_invoice` with that ID to get the signed ZIP,
-or `anaf_download_invoice_pdf` to save the same invoice rendered as a PDF.
+A message `id` is a download id — pass it as `download_id`, along with the `output_path` to
+write to. `anaf_download_invoice` saves the signed ZIP:
+
+```json
+{ "download_id": "3041234567", "output_path": "./invoices/received-3041234567.zip" }
+```
+
+`anaf_download_invoice_pdf` saves the same invoice rendered as a PDF:
+
+```json
+{ "download_id": "3041234567", "output_path": "./invoices/received-3041234567.pdf" }
+```
 
 ## Checking a specific upload
 

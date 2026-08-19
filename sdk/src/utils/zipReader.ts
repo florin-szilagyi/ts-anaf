@@ -18,6 +18,13 @@ const MAX_COMMENT_SIZE = 0xffff;
 const METHOD_STORED = 0;
 const METHOD_DEFLATE = 8;
 
+/**
+ * Ceiling on a single decompressed entry. e-Factura invoices are a few KB;
+ * this only exists so a malformed or hostile archive cannot make us allocate
+ * unbounded memory before the size check runs.
+ */
+const MAX_ENTRY_BYTES = 64 * 1024 * 1024;
+
 /** General purpose bit 0: the entry is encrypted. */
 const FLAG_ENCRYPTED = 0x0001;
 
@@ -75,6 +82,13 @@ export function readZipEntries(buffer: Buffer): ZipEntry[] {
     throw new AnafValidationError('Unsupported ZIP archive: ZIP64 format');
   }
 
+  // Entries must live inside the directory the EOCD declares, not merely
+  // inside the buffer — otherwise a record could run on into the EOCD itself.
+  const centralDirEnd = centralDirOffset + centralDirSize;
+  if (centralDirOffset > eocd || centralDirEnd > eocd) {
+    throw new AnafValidationError('Invalid ZIP archive: corrupt central directory');
+  }
+
   const entries: ZipEntry[] = [];
   let offset = centralDirOffset;
 
@@ -95,7 +109,7 @@ export function readZipEntries(buffer: Buffer): ZipEntry[] {
     // subarray() clamps instead of throwing, so an oversized length field would
     // otherwise yield a silently truncated name rather than a parse failure.
     const headerEnd = offset + 46 + nameLength + extraLength + commentLength;
-    if (headerEnd > buffer.length) {
+    if (headerEnd > centralDirEnd) {
       throw new AnafValidationError('Invalid ZIP archive: corrupt central directory');
     }
 
@@ -134,11 +148,18 @@ export function readZipEntries(buffer: Buffer): ZipEntry[] {
     if (compressionMethod === METHOD_STORED) {
       data = Buffer.from(raw);
     } else if (compressionMethod === METHOD_DEFLATE) {
+      if (uncompressedSize > MAX_ENTRY_BYTES) {
+        throw new AnafValidationError(`ZIP entry "${name}" exceeds the ${MAX_ENTRY_BYTES}-byte limit`);
+      }
       try {
-        data = inflateRawSync(raw);
+        // The declared size can lie, so cap the inflate itself as well.
+        data = inflateRawSync(raw, { maxOutputLength: MAX_ENTRY_BYTES });
       } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
         throw new AnafValidationError(
-          `Invalid ZIP archive: failed to inflate "${name}" (${cause instanceof Error ? cause.message : String(cause)})`
+          isOutputTooLarge(cause)
+            ? `ZIP entry "${name}" exceeds the ${MAX_ENTRY_BYTES}-byte limit`
+            : `Invalid ZIP archive: failed to inflate "${name}" (${message})`
         );
       }
     } else {
@@ -154,7 +175,16 @@ export function readZipEntries(buffer: Buffer): ZipEntry[] {
     entries.push({ name, data });
   }
 
+  if (offset !== centralDirEnd) {
+    throw new AnafValidationError('Invalid ZIP archive: corrupt central directory');
+  }
+
   return entries;
+}
+
+/** True when zlib refused to inflate because the output hit `maxOutputLength`. */
+function isOutputTooLarge(cause: unknown): boolean {
+  return (cause as { code?: string } | undefined)?.code === 'ERR_BUFFER_TOO_LARGE';
 }
 
 /** Root elements of the documents e-Factura archives carry. */

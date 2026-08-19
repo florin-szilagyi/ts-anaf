@@ -1,11 +1,35 @@
-import { deflateRawSync, crc32 } from 'node:zlib';
+import { deflateRawSync } from 'node:zlib';
+
+// zlib.crc32 only exists on Node >= 20.15, below the versions this SDK
+// supports, so the checksum is computed here instead.
+const METHOD_DEFLATE = 8;
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let bit = 0; bit < 8; bit++) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(data: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
 
 /** One file to place in a test archive. */
 export interface ZipInput {
   name: string;
   content: string | Buffer;
-  /** 0 = stored, 8 = deflate. Defaults to deflate. */
-  method?: 0 | 8;
+  /** 0 = stored, 8 = deflate. Any other value exercises the reject path. Defaults to deflate. */
+  method?: number;
   /** General purpose bit flag, e.g. 0x0001 to mark the entry encrypted. */
   flags?: number;
 }
@@ -31,7 +55,7 @@ export function buildZip(files: ZipInput[], options: ZipOptions = {}): Buffer {
     const flags = file.flags ?? 0;
     const nameBytes = Buffer.from(file.name, 'utf8');
     const raw = Buffer.isBuffer(file.content) ? file.content : Buffer.from(file.content, 'utf8');
-    const compressed = method === 0 ? raw : deflateRawSync(raw);
+    const compressed = method === METHOD_DEFLATE ? deflateRawSync(raw) : raw;
 
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);
