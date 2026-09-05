@@ -15,6 +15,7 @@ export {
   type UploadArgs,
   type StatusArgs,
   type DownloadArgs,
+  type DownloadPdfArgs,
   type MessagesArgs,
   type ValidateArgs,
   type ValidateSignatureArgs,

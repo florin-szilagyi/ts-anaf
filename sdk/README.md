@@ -46,41 +46,54 @@ console.log('Access token:', tokens.access_token);
 const newTokens = await auth.refreshAccessToken(tokens.refresh_token);
 ```
 
-### 2. AnafClient - API Operations
+### 2. AnafEfacturaClient - API Operations
+
+The client is constructed once with a refresh token and resolves access tokens
+itself, so no call takes a token argument.
 
 ```typescript
-import { AnafClient } from '@florinszilagyi/anaf-ts-sdk';
+import { AnafEfacturaClient } from '@florinszilagyi/anaf-ts-sdk';
 
-const client = new AnafClient({
-  vatNumber: 'RO12345678',
-  testMode: true, // Use test environment
-});
+const client = new AnafEfacturaClient(
+  {
+    vatNumber: 'RO12345678',
+    testMode: true, // Use test environment
+    refreshToken: tokens.refresh_token,
+  },
+  auth // the AnafAuthenticator from step 1
+);
 
 // Upload a document
-const uploadResult = await client.uploadDocument(tokens.access_token, xmlContent, {
+const uploadResult = await client.uploadDocument(xmlContent, {
   standard: 'UBL',
   executare: true,
 });
 
 // Check upload status
-const status = await client.getUploadStatus(tokens.access_token, uploadResult.index_incarcare);
+const status = await client.getUploadStatus(uploadResult.indexIncarcare);
 
-// Download processed document
-if (status.id_descarcare) {
-  const result = await client.downloadDocument(tokens.access_token, status.id_descarcare);
+// Download processed document (ZIP archive: invoice + detached signature)
+if (status.idDescarcare) {
+  const result = await client.downloadDocument(status.idDescarcare);
+
+  // Or unwrap the archive and get the invoice XML directly
+  const invoiceXml = await client.downloadDocumentXml(status.idDescarcare);
+
+  // …which is what you need to render the invoice as a PDF
+  const pdf = await client.convertXmlToPdf(invoiceXml, 'FACT1');
 }
 
 // List recent messages
-const messages = await client.getMessages(tokens.access_token, {
+const messages = await client.getMessages({
   zile: 7, // Last 7 days
   filtru: 'E', // Only errors
 });
 
 // Validate XML
-const validation = await client.validateXml(tokens.access_token, xmlContent, 'FACT1');
+const validation = await client.validateXml(xmlContent, 'FACT1');
 
 // Convert XML to PDF
-const pdfBuffer = await client.convertXmlToPdf(tokens.access_token, xmlContent, 'FACT1');
+const pdfBuffer = await client.convertXmlToPdf(xmlContent, 'FACT1');
 ```
 
 ### 3. UblBuilder - UBL XML Generation

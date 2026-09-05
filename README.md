@@ -81,6 +81,7 @@ claude mcp add anaf -- npx -y @florinszilagyi/anaf-mcp
 | `anaf_upload_invoice` | Yes | Upload UBL XML to e-Factura (B2B or B2C) |
 | `anaf_invoice_status` | Yes | Poll upload processing status |
 | `anaf_download_invoice` | Yes | Download the processed ZIP archive |
+| `anaf_download_invoice_pdf` | Yes | Download an invoice and save it rendered as a PDF |
 | `anaf_list_messages` | Yes | List sent/received/error messages |
 
 ### Example agentic workflows

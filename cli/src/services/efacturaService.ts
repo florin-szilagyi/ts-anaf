@@ -40,6 +40,7 @@ export interface EfacturaClientLike {
   uploadB2CDocument(xml: string, options?: UploadOptions): Promise<UploadResponse>;
   getUploadStatus(uploadId: string): Promise<StatusResponse>;
   downloadDocument(downloadId: string): Promise<Buffer>;
+  downloadDocumentXml(downloadId: string): Promise<string>;
   getMessages(params: { zile: number; filtru?: MessageFilter }): Promise<ListMessagesResponse>;
   getMessagesPaginated(params: {
     startTime: number;
@@ -93,6 +94,11 @@ export interface StatusArgs {
 export interface DownloadArgs {
   downloadId: string;
   clientSecret: string;
+}
+
+export interface DownloadPdfArgs extends DownloadArgs {
+  standard?: 'FACT1' | 'FCN';
+  noValidation?: boolean;
 }
 
 export interface MessagesArgs {
@@ -209,6 +215,44 @@ export class EfacturaService {
         return await client.downloadDocument(args.downloadId);
       } catch (cause) {
         throw wrapAnafError('DOWNLOAD_FAILED', 'Failed to download document', cause);
+      }
+    });
+  }
+
+  /**
+   * Download a document and return the invoice XML unwrapped from ANAF's ZIP.
+   */
+  async downloadXml(args: DownloadArgs): Promise<string> {
+    return this.withClient(args.clientSecret, async (client) => {
+      try {
+        return await client.downloadDocumentXml(args.downloadId);
+      } catch (cause) {
+        throw wrapAnafError('DOWNLOAD_FAILED', 'Failed to download document', cause);
+      }
+    });
+  }
+
+  /**
+   * Download a document and render it as a PDF through the ANAF transform service.
+   *
+   * Both calls share one token manager, so a stored token that needs refreshing
+   * is refreshed once for the pair rather than once per leg.
+   */
+  async downloadPdf(args: DownloadPdfArgs): Promise<Buffer> {
+    return this.withClientAndTools(args.clientSecret, async (client, tools) => {
+      let xml: string;
+      try {
+        xml = await client.downloadDocumentXml(args.downloadId);
+      } catch (cause) {
+        throw wrapAnafError('DOWNLOAD_FAILED', 'Failed to download document', cause);
+      }
+
+      try {
+        return args.noValidation
+          ? await tools.convertXmlToPdfNoValidation(xml, args.standard ?? 'FACT1')
+          : await tools.convertXmlToPdf(xml, args.standard ?? 'FACT1');
+      } catch (cause) {
+        throw wrapAnafError('PDF_CONVERSION_FAILED', 'Failed to convert XML to PDF', cause);
       }
     });
   }
@@ -348,6 +392,38 @@ export class EfacturaService {
 
     try {
       return await fn(client);
+    } finally {
+      this.persistRotation(tokenManager, originalRefreshToken);
+    }
+  }
+
+  /**
+   * Run an operation that needs both clients within a single token cycle.
+   *
+   * Building the two clients off one token manager keeps an expiring access
+   * token to one refresh (and one rotation) for the whole command.
+   */
+  private async withClientAndTools<T>(
+    clientSecret: string,
+    fn: (client: EfacturaClientLike, tools: EfacturaToolsClientLike) => Promise<T>
+  ): Promise<T> {
+    const { cui, env } = this.resolveActiveCompany();
+    const credential = this.credentialService.get();
+    const authenticator = this.buildAuthenticator(credential.clientId, clientSecret, credential.redirectUri);
+    const { tokenManager, originalRefreshToken } = this.selectTokenManager(authenticator);
+
+    const client = this.clientFactory({
+      vatNumber: cui.replace(/^RO/i, ''),
+      testMode: env === 'test',
+      tokenManager,
+    });
+    const tools = this.toolsFactory({
+      testMode: env === 'test',
+      tokenManager,
+    });
+
+    try {
+      return await fn(client, tools);
     } finally {
       this.persistRotation(tokenManager, originalRefreshToken);
     }

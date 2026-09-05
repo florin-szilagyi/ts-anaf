@@ -16,8 +16,11 @@ import { UPLOAD_INVOICE_TOOL_DEFINITION, handleUploadInvoice, uploadInvoiceInput
 import { INVOICE_STATUS_TOOL_DEFINITION, handleInvoiceStatus, invoiceStatusInputSchema } from './tools/status.js';
 import {
   DOWNLOAD_INVOICE_TOOL_DEFINITION,
+  DOWNLOAD_INVOICE_PDF_TOOL_DEFINITION,
   handleDownloadInvoice,
+  handleDownloadInvoicePdf,
   downloadInvoiceInputSchema,
+  downloadInvoicePdfInputSchema,
 } from './tools/download.js';
 import { LIST_MESSAGES_TOOL_DEFINITION, handleListMessages, listMessagesInputSchema } from './tools/messages.js';
 import {
@@ -48,6 +51,7 @@ const TOOL_DEFINITIONS = [
   UPLOAD_INVOICE_TOOL_DEFINITION,
   INVOICE_STATUS_TOOL_DEFINITION,
   DOWNLOAD_INVOICE_TOOL_DEFINITION,
+  DOWNLOAD_INVOICE_PDF_TOOL_DEFINITION,
   LIST_MESSAGES_TOOL_DEFINITION,
 ];
 
@@ -115,6 +119,10 @@ export async function handleToolCall(name: string, args: unknown): Promise<AnyTo
       case DOWNLOAD_INVOICE_TOOL_DEFINITION.name: {
         const input = downloadInvoiceInputSchema.parse(args);
         return runAuthedTool((s) => handleDownloadInvoice(input, { efactura: s.efactura }));
+      }
+      case DOWNLOAD_INVOICE_PDF_TOOL_DEFINITION.name: {
+        const input = downloadInvoicePdfInputSchema.parse(args);
+        return runAuthedTool((s) => handleDownloadInvoicePdf(input, { efactura: s.efactura, tools: s.tools }));
       }
       case LIST_MESSAGES_TOOL_DEFINITION.name: {
         const input = listMessagesInputSchema.parse(args);

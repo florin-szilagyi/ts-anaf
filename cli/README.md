@@ -166,6 +166,18 @@ anaf-cli efactura status --upload-id 12345
 anaf-cli efactura download --download-id 67890 [--out response.zip]
 ```
 
+Downloads are ZIP archives by default. `--as` unwraps them for you:
+
+```bash
+anaf-cli efactura download --download-id 67890 --as xml --out invoice.xml
+anaf-cli efactura download --download-id 67890 --as pdf --out invoice.pdf
+```
+
+`--as pdf` renders the downloaded invoice through the ANAF transform service; it
+accepts the same `--standard FACT1|FCN` and `--no-validation` flags as `efactura pdf`.
+Those two flags are rejected with any other `--as` value, so a mistyped format never
+passes silently.
+
 **Messages:**
 
 ```bash

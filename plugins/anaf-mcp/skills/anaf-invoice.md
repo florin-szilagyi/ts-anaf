@@ -64,7 +64,22 @@ Call `anaf_invoice_status` with the upload index. Retry every 30-60 seconds unti
 
 ## Step 5 — Download (optional)
 
-Call `anaf_download_invoice` with the upload index to get the signed ZIP archive from ANAF.
+Downloads are keyed by the `idDescarcare` that `anaf_invoice_status` returns once the status
+is `ok` — not by the upload index. Both download tools also require an `output_path` to write to.
+
+```json
+{ "download_id": "4013735587", "output_path": "./invoices/FCT-1.zip" }
+```
+
+Call `anaf_download_invoice` with that to get the signed ZIP archive from ANAF. For a
+human-readable copy, call `anaf_download_invoice_pdf` instead — it unwraps the archive and
+writes the invoice rendered as a PDF:
+
+```json
+{ "download_id": "4013735587", "output_path": "./invoices/FCT-1.pdf", "standard": "FACT1" }
+```
+
+Pass `standard: "FCN"` for credit notes.
 
 ## Common invoice patterns
 
@@ -79,6 +94,6 @@ Call `anaf_download_invoice` with the upload index to get the signed ZIP archive
 ## Tips
 
 - Always validate before uploading — ANAF rejects invalid XML without a clear error at upload time
-- Save the `uploadIndex` — you need it to check status and download
+- Save the `uploadIndex` — you need it to check status; downloads use the `idDescarcare` that `anaf_invoice_status` returns
 - ANAF processing usually completes in under 5 minutes
 - Test with `ANAF_ENV=test` first before going live with `prod`

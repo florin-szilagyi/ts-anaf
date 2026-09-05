@@ -19,6 +19,7 @@ import type {
   UploadArgs,
   StatusArgs,
   DownloadArgs,
+  DownloadPdfArgs,
   MessagesArgs,
   ValidateArgs,
   ValidateSignatureArgs,
@@ -39,6 +40,8 @@ class StubEfacturaService {
   uploadCalls: UploadArgs[] = [];
   statusCalls: StatusArgs[] = [];
   downloadCalls: DownloadArgs[] = [];
+  downloadXmlCalls: DownloadArgs[] = [];
+  downloadPdfCalls: DownloadPdfArgs[] = [];
   messagesCalls: MessagesArgs[] = [];
   validateCalls: ValidateArgs[] = [];
   validateSignatureCalls: ValidateSignatureArgs[] = [];
@@ -57,6 +60,14 @@ class StubEfacturaService {
   async download(args: DownloadArgs) {
     this.downloadCalls.push(args);
     return Buffer.from('ZIPDATA');
+  }
+  async downloadXml(args: DownloadArgs) {
+    this.downloadXmlCalls.push(args);
+    return '<Invoice/>';
+  }
+  async downloadPdf(args: DownloadPdfArgs) {
+    this.downloadPdfCalls.push(args);
+    return Buffer.from('%PDF-DOWNLOADED');
   }
   messagesResult: unknown = { mesaje: [{ id: 'm-1' }] };
   async getMessages(args: MessagesArgs) {
@@ -277,6 +288,126 @@ describe('efacturaDownload', () => {
       h.restore();
     }
   });
+
+  it('writes the invoice XML with --as xml', async () => {
+    const h = harness();
+    try {
+      await efacturaDownload({ output: h.text, services: h.services }, { downloadId: 'd-1', as: 'xml' });
+      expect(h.efacturaService.downloadXmlCalls[0]).toMatchObject({ downloadId: 'd-1' });
+      expect(h.efacturaService.downloadCalls).toHaveLength(0);
+      expect(h.stdout.bytes.toString('utf8')).toBe('<Invoice/>');
+    } finally {
+      h.restore();
+    }
+  });
+
+  it('writes a rendered PDF with --as pdf', async () => {
+    const h = harness();
+    try {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'anaf-cli-efdlpdf-'));
+      const outPath = path.join(tmp, 'invoice.pdf');
+      await efacturaDownload({ output: h.text, services: h.services }, { downloadId: 'd-1', as: 'pdf', out: outPath });
+      expect(h.efacturaService.downloadPdfCalls[0]).toMatchObject({
+        downloadId: 'd-1',
+        standard: 'FACT1',
+        noValidation: false,
+      });
+      expect(fs.readFileSync(outPath, 'utf8')).toBe('%PDF-DOWNLOADED');
+      fs.rmSync(tmp, { recursive: true });
+    } finally {
+      h.restore();
+    }
+  });
+
+  it('passes --standard and --no-validation through to the PDF conversion', async () => {
+    const h = harness();
+    try {
+      await efacturaDownload(
+        { output: h.text, services: h.services },
+        { downloadId: 'd-2', as: 'PDF', standard: 'FCN', validation: false }
+      );
+      expect(h.efacturaService.downloadPdfCalls[0]).toMatchObject({
+        downloadId: 'd-2',
+        standard: 'FCN',
+        noValidation: true,
+      });
+    } finally {
+      h.restore();
+    }
+  });
+
+  it('rejects --standard before making any network call', async () => {
+    const h = harness();
+    try {
+      await expect(
+        efacturaDownload({ output: h.text, services: h.services }, { downloadId: 'd-1', as: 'pdf', standard: 'FACT9' })
+      ).rejects.toBeInstanceOf(CliError);
+      expect(h.efacturaService.downloadPdfCalls).toHaveLength(0);
+      expect(h.efacturaService.downloadXmlCalls).toHaveLength(0);
+    } finally {
+      h.restore();
+    }
+  });
+
+  it('normalizes a lowercase --standard instead of passing it through', async () => {
+    const h = harness();
+    try {
+      await efacturaDownload(
+        { output: h.text, services: h.services },
+        { downloadId: 'd-1', as: 'pdf', standard: 'fcn' }
+      );
+      expect(h.efacturaService.downloadPdfCalls[0]).toMatchObject({ standard: 'FCN' });
+    } finally {
+      h.restore();
+    }
+  });
+
+  it('rejects --standard when --as is not pdf', async () => {
+    const h = harness();
+    try {
+      await expect(
+        efacturaDownload({ output: h.text, services: h.services }, { downloadId: 'd-1', as: 'xml', standard: 'FCN' })
+      ).rejects.toBeInstanceOf(CliError);
+      expect(h.efacturaService.downloadXmlCalls).toHaveLength(0);
+    } finally {
+      h.restore();
+    }
+  });
+
+  it('rejects --no-validation when --as is not pdf', async () => {
+    const h = harness();
+    try {
+      await expect(
+        efacturaDownload({ output: h.text, services: h.services }, { downloadId: 'd-1', validation: false })
+      ).rejects.toBeInstanceOf(CliError);
+      expect(h.efacturaService.downloadCalls).toHaveLength(0);
+    } finally {
+      h.restore();
+    }
+  });
+
+  it('leaves the default zip path untouched when no new flags are given', async () => {
+    const h = harness();
+    try {
+      await efacturaDownload({ output: h.text, services: h.services }, { downloadId: 'd-1', validation: true });
+      expect(h.efacturaService.downloadCalls).toHaveLength(1);
+      expect(h.stdout.bytes.toString('utf8')).toBe('ZIPDATA');
+    } finally {
+      h.restore();
+    }
+  });
+
+  it('throws BAD_USAGE on an unknown --as value', async () => {
+    const h = harness();
+    try {
+      await expect(
+        efacturaDownload({ output: h.text, services: h.services }, { downloadId: 'd-1', as: 'docx' })
+      ).rejects.toBeInstanceOf(CliError);
+      expect(h.efacturaService.downloadCalls).toHaveLength(0);
+    } finally {
+      h.restore();
+    }
+  });
 });
 
 describe('efacturaMessages', () => {
@@ -454,6 +585,18 @@ describe('efacturaValidateSignature', () => {
 });
 
 describe('efacturaPdf', () => {
+  it('rejects an invalid --standard before reading input', async () => {
+    const h = harness();
+    try {
+      await expect(
+        efacturaPdf({ output: h.text, services: h.services }, { xml: '/nonexistent.xml', standard: 'nope' })
+      ).rejects.toBeInstanceOf(CliError);
+      expect(h.efacturaService.pdfCalls).toHaveLength(0);
+    } finally {
+      h.restore();
+    }
+  });
+
   it('writes PDF bytes to --out and emits confirmation to stderr', async () => {
     const h = harness();
     try {

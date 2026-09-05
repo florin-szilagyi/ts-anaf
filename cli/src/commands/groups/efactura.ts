@@ -45,6 +45,9 @@ interface StatusCmdOpts {
 interface DownloadCmdOpts {
   downloadId?: string;
   out?: string;
+  as?: string;
+  standard?: string;
+  validation?: boolean;
   clientSecretStdin?: boolean;
 }
 
@@ -60,7 +63,7 @@ interface MessagesCmdOpts {
 interface ValidateCmdOpts {
   xml?: string;
   stdin?: boolean;
-  standard?: 'FACT1' | 'FCN';
+  standard?: string;
   clientSecretStdin?: boolean;
 }
 
@@ -73,7 +76,7 @@ interface ValidateSignatureCmdOpts {
 interface PdfCmdOpts {
   xml?: string;
   stdin?: boolean;
-  standard?: 'FACT1' | 'FCN';
+  standard?: string;
   out?: string;
   validation?: boolean;
   clientSecretStdin?: boolean;
@@ -207,6 +210,38 @@ export async function efacturaStatus(deps: CommandDeps, opts: StatusCmdOpts): Pr
   );
 }
 
+const DOWNLOAD_FORMATS = ['zip', 'xml', 'pdf'] as const;
+type DownloadFormat = (typeof DOWNLOAD_FORMATS)[number];
+
+const DOCUMENT_STANDARDS = ['FACT1', 'FCN'] as const;
+type DocumentStandard = (typeof DOCUMENT_STANDARDS)[number];
+
+function resolveDownloadFormat(raw?: string): DownloadFormat {
+  if (!raw) return 'zip';
+  const value = raw.toLowerCase();
+  if ((DOWNLOAD_FORMATS as readonly string[]).includes(value)) return value as DownloadFormat;
+  throw new CliError({
+    code: 'BAD_USAGE',
+    message: `Invalid --as "${raw}". Use: ${DOWNLOAD_FORMATS.join(', ')}.`,
+    category: 'user_input',
+  });
+}
+
+/**
+ * Validate `--standard` locally so a typo fails before any network call
+ * rather than after a document has already been fetched.
+ */
+function resolveStandard(raw?: string): DocumentStandard {
+  if (!raw) return 'FACT1';
+  const value = raw.toUpperCase();
+  if ((DOCUMENT_STANDARDS as readonly string[]).includes(value)) return value as DocumentStandard;
+  throw new CliError({
+    code: 'BAD_USAGE',
+    message: `Invalid --standard "${raw}". Use: ${DOCUMENT_STANDARDS.join(', ')}.`,
+    category: 'user_input',
+  });
+}
+
 export async function efacturaDownload(deps: CommandDeps, opts: DownloadCmdOpts): Promise<void> {
   if (!opts.downloadId) {
     throw new CliError({
@@ -215,7 +250,42 @@ export async function efacturaDownload(deps: CommandDeps, opts: DownloadCmdOpts)
       category: 'user_input',
     });
   }
+  const format = resolveDownloadFormat(opts.as);
+  const standard = resolveStandard(opts.standard);
+  const noValidation = opts.validation === false;
+
+  // Rendering options only mean something on the PDF path — accepting them
+  // silently elsewhere would hide a mistyped --as from the user.
+  if (format !== 'pdf' && (opts.standard !== undefined || noValidation)) {
+    throw new CliError({
+      code: 'BAD_USAGE',
+      message: `--standard and --no-validation apply to "--as pdf" only (got "--as ${format}").`,
+      category: 'user_input',
+    });
+  }
+
   const clientSecret = await resolveClientSecret(deps, opts);
+
+  if (format === 'pdf') {
+    const pdf = await deps.services.efacturaService.downloadPdf({
+      downloadId: opts.downloadId,
+      clientSecret,
+      standard,
+      noValidation,
+    });
+    writeBinary(deps.output, pdf, { path: opts.out });
+    return;
+  }
+
+  if (format === 'xml') {
+    const xml = await deps.services.efacturaService.downloadXml({
+      downloadId: opts.downloadId,
+      clientSecret,
+    });
+    writeBinary(deps.output, Buffer.from(xml, 'utf8'), { path: opts.out });
+    return;
+  }
+
   const bytes = await deps.services.efacturaService.download({
     downloadId: opts.downloadId,
     clientSecret,
@@ -279,12 +349,13 @@ export async function efacturaMessages(deps: CommandDeps, opts: MessagesCmdOpts)
 }
 
 export async function efacturaValidate(deps: CommandDeps, opts: ValidateCmdOpts): Promise<void> {
+  const standard = resolveStandard(opts.standard);
   const xml = await resolveXmlInput(opts);
   const clientSecret = await resolveClientSecret(deps, opts);
   const result = await deps.services.efacturaService.validateXml({
     clientSecret,
     xml,
-    standard: opts.standard ?? 'FACT1',
+    standard,
   });
   renderSuccess(deps.output, result, (d) =>
     kv([
@@ -343,13 +414,14 @@ export async function efacturaValidateSignature(deps: CommandDeps, opts: Validat
 }
 
 export async function efacturaPdf(deps: CommandDeps, opts: PdfCmdOpts): Promise<void> {
+  const standard = resolveStandard(opts.standard);
   const xml = await resolveXmlInput(opts);
   const clientSecret = await resolveClientSecret(deps, opts);
   const noValidation = opts.validation === false;
   const bytes = await deps.services.efacturaService.convertToPdf({
     clientSecret,
     xml,
-    standard: opts.standard ?? 'FACT1',
+    standard,
     noValidation,
   });
   writeBinary(deps.output, bytes, { path: opts.out });
@@ -388,8 +460,11 @@ export function registerEfactura(parent: Command, deps: CommandDeps): void {
 
   efactura
     .command('download')
-    .description('Download an e-Factura document by id')
+    .description('Download an e-Factura document by id (ZIP archive, invoice XML, or rendered PDF)')
     .option('--download-id <id>', 'ANAF download id')
+    .option('--as <fmt>', 'download as: zip (default) | xml | pdf')
+    .option('--standard <std>', 'PDF rendering standard (FACT1|FCN); requires --as pdf')
+    .option('--no-validation', 'use the no-validation PDF conversion endpoint; requires --as pdf')
     .option('--out <path>', 'output file path')
     .option('--client-secret-stdin', 'read OAuth client secret from stdin')
     .action((opts: DownloadCmdOpts) => efacturaDownload(deps, opts));
