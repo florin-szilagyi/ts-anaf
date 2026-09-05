@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-09-05
+
+### Added
+
+- **`EfacturaClient.downloadDocumentXml(downloadId)`** — downloads a document and
+  returns the invoice XML unwrapped from ANAF's ZIP archive, which holds the
+  invoice plus a detached `semnatura_*.xml` signature. Mirrored on the
+  `AnafEfacturaClient` facade. Pairs with `convertXmlToPdf` to turn a download
+  into a PDF without unzipping by hand:
+
+  ```typescript
+  const xml = await client.downloadDocumentXml(status.idDescarcare);
+  const pdf = await client.convertXmlToPdf(xml, 'FACT1');
+  ```
+
+- **`readZipEntries` / `extractInvoiceXml`** exported for callers that already
+  hold an archive. The reader is dependency-free — it walks the central
+  directory and inflates with `node:zlib` — so nothing new is added to the
+  bundles that inline this SDK.
+
+  `extractInvoiceXml` selects the invoice by root element (`Invoice` or
+  `CreditNote`, namespace prefix ignored) rather than by position, so an archive
+  carrying an extra document alongside the invoice still yields the invoice.
+  It rejects ZIP64, encrypted entries, unsupported compression methods, and
+  archives whose central directory does not match its declared bounds, and caps
+  a single decompressed entry at 64 MB.
+
 ## [1.5.1] - 2026-08-06
 
 ### Fixed
