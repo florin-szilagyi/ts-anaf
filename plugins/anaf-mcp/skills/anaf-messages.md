@@ -44,8 +44,11 @@ write to. `anaf_download_invoice` saves the signed ZIP:
 `anaf_download_invoice_pdf` saves the same invoice rendered as a PDF:
 
 ```json
-{ "download_id": "3041234567", "output_path": "./invoices/received-3041234567.pdf" }
+{ "download_id": "3041234567", "output_path": "./invoices/received-3041234567.pdf", "standard": "FACT1" }
 ```
+
+Use `"standard": "FCN"` when the document is a credit note — a received message can be
+either, so check before rendering.
 
 ## Checking a specific upload
 

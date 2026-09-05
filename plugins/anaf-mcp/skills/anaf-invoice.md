@@ -94,6 +94,6 @@ Pass `standard: "FCN"` for credit notes.
 ## Tips
 
 - Always validate before uploading — ANAF rejects invalid XML without a clear error at upload time
-- Save the `uploadIndex` — you need it to check status and download
+- Save the `uploadIndex` — you need it to check status; downloads use the `idDescarcare` that `anaf_invoice_status` returns
 - ANAF processing usually completes in under 5 minutes
 - Test with `ANAF_ENV=test` first before going live with `prod`
