@@ -65,3 +65,16 @@ export class AnafUnexpectedResponseError extends AnafSdkError {
     Object.setPrototypeOf(this, AnafUnexpectedResponseError.prototype);
   }
 }
+
+/**
+ * A received document carries several VAT totals and none of them uniquely
+ * matches the document currency, so the correct one cannot be chosen without
+ * guessing. Narrower than {@link AnafValidationError} on purpose: the
+ * document is otherwise well-formed and only the VAT total is ambiguous.
+ */
+export class AnafAmbiguousTaxTotalError extends AnafValidationError {
+  constructor(message: string) {
+    super(message);
+    Object.setPrototypeOf(this, AnafAmbiguousTaxTotalError.prototype);
+  }
+}
