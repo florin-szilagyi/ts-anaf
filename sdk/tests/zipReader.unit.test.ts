@@ -178,6 +178,20 @@ describe('extractInvoiceXml', () => {
     expect(extractInvoiceXml(zip)).toBe(prefixed);
   });
 
+  it('picks a CII invoice out of a mixed archive', () => {
+    // ANAF also delivers CII (CrossIndustryInvoice) documents. Before it was
+    // recognised, the position fallback could hand back the attachment.
+    const cii =
+      '<?xml version="1.0"?><rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"><rsm:ExchangedDocument><ram:ID>CII-1</ram:ID></rsm:ExchangedDocument></rsm:CrossIndustryInvoice>';
+    const zip = buildZip([
+      { name: '0-anexa.xml', content: '<?xml version="1.0"?><Anexa>attachment</Anexa>' },
+      { name: '1-invoice.xml', content: cii },
+      { name: 'semnatura_1.xml', content: SIGNATURE_XML },
+    ]);
+
+    expect(extractInvoiceXml(zip)).toBe(cii);
+  });
+
   it('falls back to the first non-signature XML when no root element matches', () => {
     const other = '<?xml version="1.0"?><Other>payload</Other>';
     const zip = buildZip([
