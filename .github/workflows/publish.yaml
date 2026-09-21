@@ -4,12 +4,20 @@ name: Publish SDK (anaf-ts-sdk)
 # Trigger:
 #   • Push of a tag matching sdk-v*.*.*
 #   • Manual run via workflow_dispatch — dry-run by default; with
-#     dry_run=false it publishes for real and creates the sdk-v* tag itself.
+#     dry_run=false it stages the release for real and creates the sdk-v*
+#     tag itself.
 #
 # npm auth uses Trusted Publishing (OIDC): the job mints a short-lived
 # credential via id-token permissions — no NPM_TOKEN secret involved.
 # Each package must have this workflow configured as a Trusted Publisher
 # on npmjs.com before the publish step can succeed.
+#
+# The release is STAGED, not published directly: `npm stage publish` uploads
+# the tarball, npm runs its checks, and a maintainer approves the version
+# with 2FA under the package's "Staged Packages" tab on npmjs.com (or with
+# `npm stage approve <stage-id>`). Nothing is live until that approval.
+# Since 2026-09-03 trusted publishers may always stage; direct publish is a
+# separate per-connection opt-in this connection does not carry.
 # ──────────────────────────────────────────────────────────────
 on:
   push:
@@ -57,14 +65,17 @@ jobs:
       - name: Test SDK
         run: pnpm --filter @florinszilagyi/anaf-ts-sdk run validate
 
-      - name: Publish SDK
+      - name: Stage SDK release on npm
         env:
           EVENT_NAME: ${{ github.event_name }}
           DRY_RUN_INPUT: ${{ github.event.inputs.dry_run }}
         run: |
           cd sdk
           if [ "$EVENT_NAME" = "push" ] || [ "$DRY_RUN_INPUT" != "true" ]; then
-            pnpm publish --access public --no-git-checks
+            # Build and validate already ran above; --ignore-scripts skips a
+            # second prepack/prepublishOnly round on the same tree.
+            npm stage publish --access public --ignore-scripts
+            echo "::notice::Release staged. Approve it with 2FA on npmjs.com → Staged Packages, or: npm stage approve <stage-id>"
           else
             pnpm publish --access public --no-git-checks --dry-run
           fi
