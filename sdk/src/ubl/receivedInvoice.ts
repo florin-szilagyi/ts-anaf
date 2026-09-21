@@ -86,8 +86,10 @@ export type ReceivedInvoice = {
 type XmlObject = Record<string, unknown>;
 
 // Matches ANAF's own per-document ceiling: it accepts invoice XML up to
-// ~10 MB (attachments embedded base64), plus headroom.
-const MAX_XML_LENGTH = 12 * 1024 * 1024;
+// ~10 MB (attachments embedded base64), plus headroom. Counted in BYTES,
+// not code units: a document of diacritics or embedded base64 costs more
+// memory than its `.length` suggests.
+const MAX_XML_BYTES = 12 * 1024 * 1024;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 const CURRENCY = /^[A-Z]{3}$/;
@@ -500,7 +502,7 @@ const parseXml = (xml: string): unknown => {
  *   totals and none of them uniquely matches the document currency.
  */
 export function parseReceivedInvoice(xml: string): ReceivedInvoice {
-  if (xml.length > MAX_XML_LENGTH) {
+  if (Buffer.byteLength(xml, 'utf8') > MAX_XML_BYTES) {
     throw new AnafValidationError('Received document is too large to parse');
   }
 

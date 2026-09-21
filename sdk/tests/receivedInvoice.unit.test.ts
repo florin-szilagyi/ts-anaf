@@ -459,6 +459,18 @@ describe('parseReceivedInvoice', () => {
     expect(() => parseReceivedInvoice(huge)).toThrow(AnafValidationError);
   });
 
+  it('measures the size guard in bytes, not code units', () => {
+    // 7M two-byte characters: 7M code units, but 14 MB of UTF-8 — over the
+    // 12 MB ceiling. Counting `.length` let this through.
+    const multiByte = `<Invoice>${'ă'.repeat(7 * 1024 * 1024)}</Invoice>`;
+    expect(multiByte.length).toBeLessThan(12 * 1024 * 1024);
+    expect(() => parseReceivedInvoice(multiByte)).toThrow(/too large/);
+
+    // Just under the ceiling, it is parsed rather than refused.
+    const withinCeiling = `<Invoice><ID>${'ă'.repeat(1024)}</ID></Invoice>`;
+    expect(parseReceivedInvoice(withinCeiling).invoiceNumber).toBe('ă'.repeat(1024));
+  });
+
   it('decodes the five predefined entities without enabling expansion', () => {
     const withEntities = `<?xml version="1.0"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
