@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-09-21
+
+### Added
+
+- **`parseReceivedInvoice(xml)`** — parses a received e-Factura document (UBL 2.1
+  `Invoice`/`CreditNote` or CII `CrossIndustryInvoice`) into a flat
+  `ReceivedInvoice` header plus its `ReceivedInvoiceLine[]` source lines. Pairs
+  with `downloadDocumentXml` to turn a download into typed data:
+
+  ```typescript
+  const xml = await client.downloadDocumentXml(status.idDescarcare);
+  const invoice = parseReceivedInvoice(xml);
+  invoice.totalAmount; // '119.00' — an exact decimal string, never a number
+  ```
+
+  Every monetary and quantity fact is returned as the exact decimal string the
+  document published, so nothing passes through float representation. The parser
+  refuses to guess: unreadable amounts, dates and currencies come back as `null`
+  instead of coerced values, malformed line facts are reported in
+  `sourceLineDiagnostics` while the line is kept, and an ambiguous VAT total
+  throws. `documentKind` distinguishes invoice, credit note and corrective
+  (384) documents, keeping an unrecognized UNTDID 1001 code verbatim, and
+  `pdfStandard` reports which converter (`FACT1`/`FCN`) the document needs.
+  XML entity expansion stays disabled for these supplier-authored documents,
+  with only the five predefined XML entities decoded.
+
+- **`AnafAmbiguousTaxTotalError`** — thrown when a received document carries
+  several VAT totals and none of them uniquely matches the document currency.
+  Extends `AnafValidationError`.
+
+- New exported types: `ReceivedInvoice`, `ReceivedInvoiceLine`,
+  `ReceivedSupplierAddress`.
+
+### Changed
+
+- `fast-xml-parser` is now a runtime dependency of the SDK (it backs the
+  received-invoice parser).
+
 ## [1.6.0] - 2026-09-05
 
 ### Added

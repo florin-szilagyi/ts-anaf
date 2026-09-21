@@ -10,6 +10,7 @@ A comprehensive TypeScript SDK for interacting with the Romanian ANAF e-Factura 
 - **Validation**: XML validation and digital signature verification
 - **PDF Conversion**: Convert XML invoices to PDF format
 - **UBL Generation**: Create compliant UBL 2.1 XML invoices
+- **Received-Invoice Parsing**: Read incoming UBL 2.1 and CII documents into a typed header plus its lines
 - **Company Data Lookup**: Fetch Romanian company details from public ANAF API
 - **TypeScript**: Full type safety and IntelliSense support
 
@@ -180,6 +181,43 @@ const customClient = new AnafDetailsClient({
   url: 'https://custom-anaf-proxy.example.com/api/tva', // Custom endpoint (e.g., proxy server)
 });
 ```
+
+### 5. parseReceivedInvoice - Reading Received Invoices
+
+Parses a document received through SPV — UBL 2.1 `Invoice`/`CreditNote` or CII
+`CrossIndustryInvoice` — into a flat header plus its source lines. Every amount
+comes back as the exact decimal **string** the document published, never a
+JavaScript number, so nothing is lost to float representation before it reaches
+your own money handling.
+
+```typescript
+import { parseReceivedInvoice } from '@florinszilagyi/anaf-ts-sdk';
+
+const xml = await client.downloadDocumentXml(status.idDescarcare);
+const invoice = parseReceivedInvoice(xml);
+
+invoice.documentStandard; // 'ubl' | 'cii'
+invoice.documentKind; // 'invoice' | 'credit_note' | 'corrective' | a raw type code
+invoice.pdfStandard; // 'FACT1' | 'FCN' — which converter convertXmlToPdf needs
+invoice.invoiceNumber; // 'EXMPL-2026-001'
+invoice.issueDate; // '2026-08-01'
+invoice.supplierName; // 'Exemplu SRL'
+invoice.supplierVatCode; // 'RO12345678'
+invoice.totalAmount; // '119.00' — a string, not 119
+invoice.sourceLines; // one ReceivedInvoiceLine per document line
+invoice.sourceLineDiagnostics; // human-readable notes for malformed/absent line facts
+```
+
+The parser refuses to guess. It throws `AnafValidationError` for an oversized
+document or an unsupported root element, `AnafXmlParsingError` for XML that is
+not well-formed, and `AnafAmbiguousTaxTotalError` when a document carries
+several VAT totals and none of them uniquely matches the document currency.
+Fields it cannot read as a valid decimal, date or currency come back as `null`
+rather than coerced, and unreadable line facts are reported in
+`sourceLineDiagnostics` while the line itself is kept.
+
+XML entity expansion stays disabled (these documents are supplier-authored),
+with only the five predefined XML entities decoded.
 
 ## AnafDetailsClient Configuration
 
