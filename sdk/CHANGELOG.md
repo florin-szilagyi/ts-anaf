@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-09-21
+
+### Added
+
+- **`parseReceivedInvoice(xml)`** — parses a received e-Factura document (UBL 2.1
+  `Invoice`/`CreditNote` or CII `CrossIndustryInvoice`) into a flat
+  `ReceivedInvoice` header plus its `ReceivedInvoiceLine[]` source lines. Pairs
+  with `downloadDocumentXml` to turn a download into typed data:
+
+  ```typescript
+  const xml = await client.downloadDocumentXml(status.idDescarcare);
+  const invoice = parseReceivedInvoice(xml);
+  invoice.totalAmount; // '119.00' — an exact decimal string, never a number
+  ```
+
+  Every monetary and quantity fact is returned as the exact decimal string the
+  document published, so nothing passes through float representation. The parser
+  refuses to guess: unreadable amounts, dates and currencies come back as `null`
+  instead of coerced values, malformed line facts are reported in
+  `sourceLineDiagnostics` while the line is kept, and an ambiguous VAT total
+  throws. `documentKind` distinguishes invoice, credit note and corrective
+  (384) documents, keeping an unrecognized UNTDID 1001 code verbatim, and
+  `pdfStandard` reports which converter (`FACT1`/`FCN`) the document needs.
+  Every header field is nullable and must be checked by the caller.
+
+  The five predefined XML entities and decimal/hex character references
+  (`&#259;`, `&#x103;` — how Romanian diacritics usually arrive) are decoded,
+  exactly one level deep. General and DTD entity expansion stays disabled for
+  these supplier-authored documents: an undefined or declared entity reference
+  passes through verbatim, and a document declaring an external entity
+  (`<!ENTITY x SYSTEM ...>`, even unreferenced) or naming an element with a
+  reserved JavaScript property name (`__proto__`, `constructor`) is refused
+  with `AnafXmlParsingError`. The size ceiling is measured in bytes of UTF-8.
+
+- **`AnafAmbiguousTaxTotalError`** — thrown when a received document carries
+  several VAT totals and none of them uniquely matches the document currency.
+  Extends `AnafValidationError`.
+
+- Amounts and line quantities accept the full XSD `decimal` lexical space that
+  UBL and CII declare (`+119.00`, `.5`, `5.`) and are returned canonically —
+  leading `+` dropped, empty integer part filled (`.5` → `0.5`), trailing `.`
+  dropped (`5.` → `5`) — with every published digit preserved, so `007.50`
+  stays `007.50`. Exponents, grouping separators and other non-decimal forms
+  are still rejected rather than guessed at.
+
+- New exported types: `ReceivedInvoice`, `ReceivedInvoiceLine`,
+  `ReceivedSupplierAddress`.
+
+### Fixed
+
+- **`extractInvoiceXml`** now recognises `CrossIndustryInvoice` as an invoice
+  root. A CII document arriving in an archive alongside another non-signature
+  XML could previously lose the selection to that other entry.
+
+### Changed
+
+- `fast-xml-parser` is now a runtime dependency of the SDK (it backs the
+  received-invoice parser).
+- **`engines.node` is now `>=20.0.0`** (was `>=14.0.0`). The declared floor no
+  longer matched reality: the workspace already requires Node 20, the publish
+  workflow builds on Node 24, and the dependency tree needs Node 16 at minimum.
+  The equally stale `engines.npm` entry was dropped.
+
 ## [1.6.0] - 2026-09-05
 
 ### Added

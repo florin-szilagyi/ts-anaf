@@ -10,6 +10,7 @@ A comprehensive TypeScript SDK for interacting with the Romanian ANAF e-Factura 
 - **Validation**: XML validation and digital signature verification
 - **PDF Conversion**: Convert XML invoices to PDF format
 - **UBL Generation**: Create compliant UBL 2.1 XML invoices
+- **Received-Invoice Parsing**: Read incoming UBL 2.1 and CII documents into a typed header plus its lines
 - **Company Data Lookup**: Fetch Romanian company details from public ANAF API
 - **TypeScript**: Full type safety and IntelliSense support
 
@@ -180,6 +181,58 @@ const customClient = new AnafDetailsClient({
   url: 'https://custom-anaf-proxy.example.com/api/tva', // Custom endpoint (e.g., proxy server)
 });
 ```
+
+### 5. parseReceivedInvoice - Reading Received Invoices
+
+Parses a document received through SPV — UBL 2.1 `Invoice`/`CreditNote` or CII
+`CrossIndustryInvoice` — into a flat header plus its source lines. Every amount
+comes back as the exact decimal **string** the document published, never a
+JavaScript number, so nothing is lost to float representation before it reaches
+your own money handling.
+
+```typescript
+import { parseReceivedInvoice } from '@florinszilagyi/anaf-ts-sdk';
+
+const xml = await client.downloadDocumentXml(status.idDescarcare);
+const invoice = parseReceivedInvoice(xml);
+
+invoice.documentStandard; // 'ubl' | 'cii'
+invoice.documentKind; // 'invoice' | 'credit_note' | 'corrective' | a raw type code
+invoice.pdfStandard; // 'FACT1' | 'FCN' — which converter convertXmlToPdf needs
+invoice.invoiceNumber; // 'EXMPL-2026-001'
+invoice.issueDate; // '2026-08-01'
+invoice.supplierName; // 'Exemplu SRL'
+invoice.supplierVatCode; // 'RO12345678'
+invoice.totalAmount; // '119.00' — a string, not 119
+invoice.sourceLines; // one ReceivedInvoiceLine per document line
+invoice.sourceLineDiagnostics; // human-readable notes for malformed/absent line facts
+```
+
+**Every header field is nullable.** `invoiceNumber`, `issueDate`,
+`totalAmount` and the rest come back as `null` when the document does not
+publish them or publishes them in a form that does not validate — the parser
+never substitutes a default. Check the fields your own flow depends on before
+using them.
+
+The parser refuses to guess. It throws:
+
+- `AnafValidationError` — the document is oversized (12 MB of UTF-8) or its
+  root element is not a recognised invoice root.
+- `AnafXmlParsingError` — the XML is not well-formed, declares an external
+  entity (`<!ENTITY x SYSTEM ...>`, even unreferenced), or names an element
+  with a reserved JavaScript property name such as `__proto__`.
+- `AnafAmbiguousTaxTotalError` — the document carries several VAT totals and
+  none of them uniquely matches the document currency.
+
+Fields it cannot read as a valid decimal, date or currency come back as `null`
+rather than coerced, and unreadable line facts are reported in
+`sourceLineDiagnostics` while the line itself is kept.
+
+General and DTD entity expansion stays disabled (these documents are
+supplier-authored, and a recursive entity definition would balloon memory).
+The five predefined XML entities and decimal/hex character references — the
+way Romanian diacritics usually arrive — are decoded, exactly one level deep:
+`&#38;amp;` is the literal text `&amp;`, never `&`.
 
 ## AnafDetailsClient Configuration
 

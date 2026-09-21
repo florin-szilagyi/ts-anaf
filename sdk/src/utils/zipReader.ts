@@ -188,17 +188,17 @@ function isOutputTooLarge(cause: unknown): boolean {
 }
 
 /** Root elements of the documents e-Factura archives carry. */
-const INVOICE_ROOT_ELEMENTS = ['Invoice', 'CreditNote'];
+const INVOICE_ROOT_ELEMENTS = ['Invoice', 'CreditNote', 'CrossIndustryInvoice'];
 
 /**
  * Extract the invoice XML from an e-Factura download archive.
  *
  * ANAF returns a ZIP containing the invoice XML plus a detached signature
  * (`semnatura_*.xml`), and can add further documents alongside them. Selection
- * is therefore by content — the entry whose root element is `Invoice` or
- * `CreditNote` wins — falling back to the first non-signature XML when no
- * entry declares a recognised root. The result is decoded as UTF-8 with any
- * byte order mark stripped.
+ * is therefore by content — the entry whose root element is `Invoice`,
+ * `CreditNote` or `CrossIndustryInvoice` wins — falling back to the first
+ * non-signature XML when no entry declares a recognised root. The result is
+ * decoded as UTF-8 with any byte order mark stripped.
  *
  * @param zipBuffer - The archive returned by `EfacturaClient.downloadDocument`
  * @returns The invoice XML document
