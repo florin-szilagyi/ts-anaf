@@ -598,9 +598,8 @@ describe('parseReceivedInvoice', () => {
 
   it('never expands XML entities (supplier-authored input)', () => {
     // A "billion laughs" shape: with entity processing on, &d; would expand
-    // multiplicatively and balloon memory inside a bulk sweep. The parser must
-    // treat references as inert text — either rejecting the document or
-    // passing the reference through UNEXPANDED.
+    // multiplicatively and balloon memory inside a bulk sweep. The reference
+    // must survive as inert text, exactly as written.
     const nested = `<?xml version="1.0"?>
 <!DOCTYPE Invoice [
   <!ENTITY a "exemplu-exemplu-exemplu">
@@ -614,13 +613,18 @@ describe('parseReceivedInvoice', () => {
   <cbc:IssueDate>2026-08-01</cbc:IssueDate>
 </Invoice>`;
 
-    let invoiceNumber: string | null = null;
-    try {
-      invoiceNumber = parseReceivedInvoice(nested).invoiceNumber;
-    } catch {
-      // Outright rejection is equally acceptable — just never expansion.
-      return;
-    }
-    expect(invoiceNumber ?? '').not.toContain('exemplu-exemplu-exemplu');
+    // The outermost declared entity, verbatim and unexpanded.
+    expect(parseReceivedInvoice(nested).invoiceNumber).toBe('&d;');
+  });
+
+  it('passes an undefined entity reference through literally', () => {
+    const undefinedEntity = `<?xml version="1.0"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>EXMPL-&nosuch;-9</cbc:ID>
+  <cbc:IssueDate>2026-08-01</cbc:IssueDate>
+</Invoice>`;
+
+    expect(parseReceivedInvoice(undefinedEntity).invoiceNumber).toBe('EXMPL-&nosuch;-9');
   });
 });
