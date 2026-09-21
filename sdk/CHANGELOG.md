@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   several VAT totals and none of them uniquely matches the document currency.
   Extends `AnafValidationError`.
 
+- Amounts and line quantities accept the full XSD `decimal` lexical space that
+  UBL and CII declare (`+119.00`, `.5`, `5.`) and are returned canonically —
+  leading `+` dropped, empty integer part filled (`.5` → `0.5`), trailing `.`
+  dropped (`5.` → `5`) — with every published digit preserved, so `007.50`
+  stays `007.50`. Exponents, grouping separators and other non-decimal forms
+  are still rejected rather than guessed at.
+
 - New exported types: `ReceivedInvoice`, `ReceivedInvoiceLine`,
   `ReceivedSupplierAddress`.
 

@@ -6,7 +6,7 @@ import { AnafAmbiguousTaxTotalError, AnafValidationError, AnafXmlParsingError } 
  * Parser for the invoice documents ANAF delivers through SPV: UBL 2.1
  * `Invoice`/`CreditNote` and CII `CrossIndustryInvoice`.
  *
- * Amounts are regex-validated decimal STRINGS, never numbers: callers put
+ * Amounts are validated decimal STRINGS, never numbers: callers put
  * them in exact-decimal storage and they must not pass through float
  * representation. A document with several `TaxTotal` amounts and no unique
  * match on the document currency throws instead of guessing.
@@ -20,7 +20,12 @@ export type ReceivedInvoiceLine = {
   sourceOrder: number;
   supplierItemCode: string | null;
   name: string | null;
-  /** Exact decimal strings as published; never JavaScript numbers. */
+  /**
+   * Decimal strings, never JavaScript numbers. Every published digit is
+   * preserved, including leading zeros and trailing fractional zeros; only
+   * the sign and an empty integer or fraction part are normalised, so a
+   * supplier's `+2.50`, `.5` and `5.` arrive as `2.50`, `0.5` and `5`.
+   */
   quantity: string | null;
   unitCode: string | null;
   unitPrice: string | null;
@@ -74,7 +79,11 @@ export type ReceivedInvoice = {
   supplierName: string | null;
   supplierVatCode: string | null;
   supplierAddress: ReceivedSupplierAddress;
-  /** Decimal strings, never numbers — exact decimals all the way through. */
+  /**
+   * Decimal strings, never numbers — exact decimals all the way through.
+   * Published digits are preserved; only the sign and an empty integer or
+   * fraction part are normalised (see `ReceivedInvoiceLine.quantity`).
+   */
   subtotalAmount: string | null;
   taxAmount: string | null;
   totalAmount: string | null;
@@ -91,7 +100,17 @@ type XmlObject = Record<string, unknown>;
 // memory than its `.length` suggests.
 const MAX_XML_BYTES = 12 * 1024 * 1024;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const DECIMAL = /^-?\d+(\.\d+)?$/;
+/**
+ * The full XSD `decimal` lexical space, which is what UBL and CII declare
+ * their amount types as: an optional sign, and digits with the integer part,
+ * the fractional part, or neither omitted (`119.00`, `+119.00`, `.5`, `5.`).
+ * A stricter pattern silently nulled amounts from conformant documents.
+ *
+ * Deliberately NOT accepted: exponents (`1e3`), grouping separators (`1,5`),
+ * whitespace inside the number, and anything with two decimal points — XSD
+ * `decimal` excludes all of them, and guessing at them would invent digits.
+ */
+const DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 const CURRENCY = /^[A-Z]{3}$/;
 
 const parser = new XMLParser({
@@ -225,15 +244,41 @@ const currencyOf = (value: unknown): string | null => {
   return currency !== null && CURRENCY.test(currency) ? currency : null;
 };
 
+/**
+ * The canonical spelling of an XSD `decimal`, so consumers see one shape
+ * whichever lexical form the supplier published: a leading `+` is dropped, an
+ * empty integer part becomes `0` (`.5` → `0.5`), and a trailing `.` is
+ * dropped (`5.` → `5`). A leading `-` is kept.
+ *
+ * Leading zeros and every fractional digit stay EXACTLY as published:
+ * `007.50` remains `007.50`. Canonical zero-stripping would be cosmetic, and
+ * the published digits are the record — the scale a supplier chose is
+ * information a consumer may need to see.
+ *
+ * Returns null when the text is not a decimal at all, so callers keep
+ * distinguishing "absent" from "malformed". Never returns a number.
+ */
+const canonicalDecimal = (text: string): string | null => {
+  if (!DECIMAL.test(text)) {
+    return null;
+  }
+  const negative = text.startsWith('-');
+  const unsigned = text.startsWith('+') || negative ? text.slice(1) : text;
+  const withInteger = unsigned.startsWith('.') ? `0${unsigned}` : unsigned;
+  const trimmed = withInteger.endsWith('.') ? withInteger.slice(0, -1) : withInteger;
+  return negative ? `-${trimmed}` : trimmed;
+};
+
 const amountOf = (value: unknown): string | null => {
   const amount = textOf(value);
-  return amount !== null && DECIMAL.test(amount) ? amount : null;
+  return amount === null ? null : canonicalDecimal(amount);
 };
 
 const sourceDecimalOf = (value: unknown, label: string, invalidFields: string[]): string | null => {
   const text = textOf(value);
   if (text === null) return null;
-  if (DECIMAL.test(text)) return text;
+  const decimal = canonicalDecimal(text);
+  if (decimal !== null) return decimal;
   invalidFields.push(label);
   return null;
 };

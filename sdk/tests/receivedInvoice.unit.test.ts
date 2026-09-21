@@ -418,6 +418,91 @@ describe('parseReceivedInvoice', () => {
     expect(parsed.totalAmount).toBeNull(); // prose rejected
   });
 
+  it('accepts every XSD decimal lexical form and returns it canonically', () => {
+    // UBL and CII declare their amount types as XSD decimal, which allows a
+    // leading +, an empty integer part and an empty fraction part. A stricter
+    // pattern silently nulled amounts from perfectly conformant documents.
+    const lexicalForms = UBL_INVOICE.replace(
+      '<cbc:TaxExclusiveAmount currencyID="RON">100.00</cbc:TaxExclusiveAmount>',
+      '<cbc:TaxExclusiveAmount currencyID="RON">.5</cbc:TaxExclusiveAmount>'
+    )
+      .replace(
+        '<cbc:TaxInclusiveAmount currencyID="RON">119.00</cbc:TaxInclusiveAmount>',
+        '<cbc:TaxInclusiveAmount currencyID="RON">+119.00</cbc:TaxInclusiveAmount>'
+      )
+      .replace(
+        '<cbc:TaxAmount currencyID="RON">19.00</cbc:TaxAmount>',
+        '<cbc:TaxAmount currencyID="RON">5.</cbc:TaxAmount>'
+      )
+      .replace(
+        '<cbc:InvoicedQuantity unitCode="H87">2.5000</cbc:InvoicedQuantity>',
+        '<cbc:InvoicedQuantity unitCode="H87">-.25</cbc:InvoicedQuantity>'
+      )
+      .replace(
+        '<cbc:PriceAmount currencyID="RON">40.0000</cbc:PriceAmount>',
+        '<cbc:PriceAmount currencyID="RON">+40.0000</cbc:PriceAmount>'
+      )
+      .replace(
+        '<cbc:LineExtensionAmount currencyID="RON">100.0000</cbc:LineExtensionAmount>',
+        '<cbc:LineExtensionAmount currencyID="RON">.075</cbc:LineExtensionAmount>'
+      )
+      .replace('<cbc:Percent>19.000</cbc:Percent>', '<cbc:Percent>19.</cbc:Percent>');
+
+    const parsed = parseReceivedInvoice(lexicalForms);
+
+    // Header amounts: + dropped, empty integer part filled, trailing . dropped.
+    expect(parsed.subtotalAmount).toBe('0.5');
+    expect(parsed.totalAmount).toBe('119.00');
+    expect(parsed.taxAmount).toBe('5');
+    // Line facts follow the same rule, negatives keeping their sign.
+    expect(parsed.sourceLines[0]).toMatchObject({
+      quantity: '-0.25',
+      unitPrice: '40.0000',
+      netAmount: '0.075',
+      taxRate: '19',
+    });
+    // Nothing became a number along the way.
+    expect(typeof parsed.subtotalAmount).toBe('string');
+    expect(typeof parsed.sourceLines[0].quantity).toBe('string');
+    // No form here is malformed, so nothing is reported.
+    expect(parsed.sourceLineDiagnostics).toEqual([]);
+  });
+
+  it('preserves published digits rather than canonicalising the value', () => {
+    // Trailing fractional zeros and leading zeros are the supplier's chosen
+    // scale, which a consumer may need to see. Only the sign and the empty
+    // integer/fraction parts are touched.
+    const paddedDigits = UBL_INVOICE.replace(
+      '<cbc:TaxInclusiveAmount currencyID="RON">119.00</cbc:TaxInclusiveAmount>',
+      '<cbc:TaxInclusiveAmount currencyID="RON">007.50</cbc:TaxInclusiveAmount>'
+    );
+
+    expect(parseReceivedInvoice(paddedDigits).totalAmount).toBe('007.50');
+  });
+
+  it('still rejects everything outside the XSD decimal space', () => {
+    // Widening the accepted forms must not start accepting these: each one
+    // would mean inventing digits the document never published.
+    for (const malformed of ['1,5', '1.2.3', 'abc', '1e3', '1 5', '+', '-', '.', '0x10']) {
+      const header = UBL_INVOICE.replace(
+        '<cbc:TaxInclusiveAmount currencyID="RON">119.00</cbc:TaxInclusiveAmount>',
+        `<cbc:TaxInclusiveAmount currencyID="RON">${malformed}</cbc:TaxInclusiveAmount>`
+      );
+      expect(parseReceivedInvoice(header).totalAmount).toBeNull();
+
+      const line = UBL_INVOICE.replace(
+        '<cbc:InvoicedQuantity unitCode="H87">2.5000</cbc:InvoicedQuantity>',
+        `<cbc:InvoicedQuantity unitCode="H87">${malformed}</cbc:InvoicedQuantity>`
+      );
+      const parsedLine = parseReceivedInvoice(line);
+      expect(parsedLine.sourceLines[0].quantity).toBeNull();
+      // A malformed value is reported, never silently dropped.
+      expect(parsedLine.sourceLineDiagnostics).toEqual([
+        'Source line 1 has invalid decimal fields: quantity.',
+      ]);
+    }
+  });
+
   it('retains a malformed source line and reports every invalid decimal', () => {
     const malformedLine = UBL_INVOICE.replace('2.5000', 'două')
       .replace('40.0000', '4e1')
