@@ -114,25 +114,59 @@ const objectOf = (value: unknown): XmlObject | null =>
 const at = (value: unknown, ...path: string[]): unknown =>
   path.reduce<unknown>((current, key) => objectOf(current)?.[key], value);
 
-/** Replace every literal occurrence, without needing `String.replaceAll`. */
-const replaceEvery = (value: string, needle: string, replacement: string): string =>
-  value.split(needle).join(replacement);
+const PREDEFINED_ENTITIES: Record<string, string> = {
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&apos;': "'",
+  '&amp;': '&',
+};
 
 /**
- * With `processEntities: false` the parser leaves even the five PREDEFINED
- * XML entities encoded, so "Alfa &amp; Beta SRL" would surface verbatim.
- * Decode exactly those five here — one pass, `&amp;` LAST, which is the
- * correct XML semantics: `&amp;lt;` decodes to the literal text "&lt;",
- * never to "<". General entity expansion stays disabled (supplier-authored
- * input; recursive definitions would balloon memory).
+ * The five predefined entities plus decimal and hex character references.
+ * Anything else — a DTD-declared or undefined entity such as `&nosuch;` —
+ * is left alone on purpose.
  */
-const decodePredefinedEntities = (value: string): string => {
-  let decoded = replaceEvery(value, '&lt;', '<');
-  decoded = replaceEvery(decoded, '&gt;', '>');
-  decoded = replaceEvery(decoded, '&quot;', '"');
-  decoded = replaceEvery(decoded, '&apos;', "'");
-  return replaceEvery(decoded, '&amp;', '&');
-};
+const CHARACTER_REFERENCE = /&(?:#x([0-9a-fA-F]+)|#(\d+)|lt|gt|quot|apos|amp);/g;
+
+/** The largest scalar value a code point may carry. */
+const MAX_CODE_POINT = 0x10ffff;
+
+/**
+ * A code point that `String.fromCodePoint` would reject, or that XML forbids
+ * in character data: NUL, a lone surrogate, or anything past the Unicode
+ * range. Such a reference stays literal text rather than throwing.
+ */
+const isUnusableCodePoint = (codePoint: number): boolean =>
+  !Number.isInteger(codePoint) ||
+  codePoint <= 0 ||
+  codePoint > MAX_CODE_POINT ||
+  (codePoint >= 0xd800 && codePoint <= 0xdfff);
+
+/**
+ * With `processEntities: false` the parser hands back the whole entity layer
+ * untouched — not only "Alfa &amp; Beta SRL" but also the character
+ * references Romanian suppliers use for diacritics ("S&#259;pt&#x103;mâna").
+ * Decode exactly the predefined entities and character references here.
+ *
+ * ONE left-to-right scan, never a sequence of passes: a pass-per-entity
+ * decoder re-reads its own output, so `&amp;lt;` would turn into "<" and
+ * `&#38;amp;` into "&". Both are wrong — XML semantics decode exactly one
+ * level, making those the literal texts "&lt;" and "&amp;". A single scan
+ * resumes after each replacement, so nothing is decoded twice.
+ *
+ * General and DTD entity expansion stays disabled (supplier-authored input;
+ * recursive definitions would balloon memory), so `&nosuch;` and a
+ * `<!ENTITY>`-declared reference pass through verbatim.
+ */
+const decodePredefinedEntities = (value: string): string =>
+  value.replace(CHARACTER_REFERENCE, (match, hex: string | undefined, decimal: string | undefined) => {
+    if (hex === undefined && decimal === undefined) {
+      return PREDEFINED_ENTITIES[match] ?? match;
+    }
+    const codePoint = hex === undefined ? Number.parseInt(decimal as string, 10) : Number.parseInt(hex, 16);
+    return isUnusableCodePoint(codePoint) ? match : String.fromCodePoint(codePoint);
+  });
 
 const textOf = (value: unknown): string | null => {
   const scalar = objectOf(value)?.['#text'] ?? value;

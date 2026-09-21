@@ -494,6 +494,66 @@ describe('parseReceivedInvoice', () => {
     expect(parseReceivedInvoice(doubled).invoiceNumber).toBe('EXMPL-&lt;8&amp;');
   });
 
+  it('decodes decimal and hex character references', () => {
+    // Romanian suppliers routinely publish diacritics as character
+    // references; leaving them encoded corrupted every supplier name.
+    const charRefs = `<?xml version="1.0"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>EXMPL-S&#259;pt&#x103;m&#38;na</cbc:ID>
+  <cbc:IssueDate>2026-08-01</cbc:IssueDate>
+  <cac:AccountingSupplierParty><cac:Party>
+    <cac:PartyLegalEntity>
+      <cbc:RegistrationName>Exemplu &#206;nt&#x103;rire SRL</cbc:RegistrationName>
+    </cac:PartyLegalEntity>
+  </cac:Party></cac:AccountingSupplierParty>
+</Invoice>`;
+
+    const parsed = parseReceivedInvoice(charRefs);
+    expect(parsed.supplierName).toBe('Exemplu Întărire SRL');
+    // &#38; is the ampersand, decoded exactly like &amp;.
+    expect(parsed.invoiceNumber).toBe('EXMPL-Săptăm&na');
+  });
+
+  it('decodes a character reference exactly once, never re-reading its output', () => {
+    // `&#38;amp;` is the literal text "&amp;": one level of decoding turns
+    // &#38; into "&" and leaves "amp;" alone. A pass-per-entity decoder would
+    // re-read that output and wrongly collapse it to "&".
+    const once = `<?xml version="1.0"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>EXMPL-&#38;amp;-&#38;lt;</cbc:ID>
+  <cbc:IssueDate>2026-08-01</cbc:IssueDate>
+</Invoice>`;
+
+    expect(parseReceivedInvoice(once).invoiceNumber).toBe('EXMPL-&amp;-&lt;');
+  });
+
+  it('leaves an out-of-range character reference as literal text', () => {
+    // String.fromCodePoint would throw on these; the document is still
+    // readable, so the reference stays put instead.
+    const outOfRange = `<?xml version="1.0"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>EXMPL-&#1114112;-&#xD800;-&#0;</cbc:ID>
+  <cbc:IssueDate>2026-08-01</cbc:IssueDate>
+</Invoice>`;
+
+    expect(parseReceivedInvoice(outOfRange).invoiceNumber).toBe('EXMPL-&#1114112;-&#xD800;-&#0;');
+  });
+
+  it('resolves a tax total whose currency attribute arrives as a character reference', () => {
+    // R&#79;N is "RON". Undecoded, neither TaxTotal matched the document
+    // currency and the document was refused as ambiguous.
+    const encodedCurrency = MULTI_TAX_TOTAL_AMBIGUOUS.replace(
+      '<cac:TaxTotal><cbc:TaxAmount currencyID="RON">3.80</cbc:TaxAmount></cac:TaxTotal>',
+      '<cac:TaxTotal><cbc:TaxAmount currencyID="EUR">3.80</cbc:TaxAmount></cac:TaxTotal>'
+    ).replace('currencyID="RON">19.00', 'currencyID="R&#79;N">19.00');
+
+    expect(parseReceivedInvoice(encodedCurrency).taxAmount).toBe('19.00');
+  });
+
   it('never expands XML entities (supplier-authored input)', () => {
     // A "billion laughs" shape: with entity processing on, &d; would expand
     // multiplicatively and balloon memory inside a bulk sweep. The parser must
