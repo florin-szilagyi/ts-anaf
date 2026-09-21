@@ -554,6 +554,36 @@ describe('parseReceivedInvoice', () => {
     expect(parseReceivedInvoice(encodedCurrency).taxAmount).toBe('19.00');
   });
 
+  it('rethrows an external entity declaration as an SDK parsing error', () => {
+    // XMLValidator accepts this; the parser refuses it. An unreferenced
+    // declaration is enough.
+    const externalEntity = `<?xml version="1.0"?>
+<!DOCTYPE Invoice [ <!ENTITY x SYSTEM "file:///etc/passwd"> ]>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>EXMPL-2026-006</cbc:ID>
+  <cbc:IssueDate>2026-08-01</cbc:IssueDate>
+</Invoice>`;
+
+    expect(() => parseReceivedInvoice(externalEntity)).toThrow(AnafXmlParsingError);
+    expect(() => parseReceivedInvoice(externalEntity)).toThrow(/could not be parsed: External entities/);
+  });
+
+  it('rethrows a reserved element name as an SDK parsing error', () => {
+    const reservedName = (element: string) => `<?xml version="1.0"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <${element}>1</${element}>
+  <cbc:ID>EXMPL-2026-007</cbc:ID>
+  <cbc:IssueDate>2026-08-01</cbc:IssueDate>
+</Invoice>`;
+
+    for (const element of ['__proto__', 'constructor']) {
+      expect(() => parseReceivedInvoice(reservedName(element))).toThrow(AnafXmlParsingError);
+      expect(() => parseReceivedInvoice(reservedName(element))).toThrow(/could not be parsed:/);
+    }
+  });
+
   it('never expands XML entities (supplier-authored input)', () => {
     // A "billion laughs" shape: with entity processing on, &d; would expand
     // multiplicatively and balloon memory inside a bulk sweep. The parser must

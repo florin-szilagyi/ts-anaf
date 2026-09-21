@@ -464,6 +464,28 @@ const parseCii = (root: XmlObject): ReceivedInvoice => {
 };
 
 /**
+ * `XMLValidator` accepts documents the parser then refuses, so the parse call
+ * has its own failure mode: it throws a bare `Error` for an external entity
+ * declaration (`<!ENTITY x SYSTEM ...>`, even an unreferenced one) and for a
+ * reserved element name such as `__proto__` or `constructor`. Both are
+ * legitimate refusals, but a bare `Error` reaching a caller is
+ * indistinguishable from a bug, so they are rethrown as the SDK's own type.
+ *
+ * `AnafXmlParsingError` predates `Error.cause` and takes no options bag, so
+ * the original wording is appended instead of chained. The XML itself is
+ * never attached: these messages carry element names at most, never document
+ * content.
+ */
+const parseXml = (xml: string): unknown => {
+  try {
+    return parser.parse(xml);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new AnafXmlParsingError(`Received document could not be parsed: ${reason}`);
+  }
+};
+
+/**
  * Parse a received e-Factura document (UBL 2.1 `Invoice`/`CreditNote` or CII
  * `CrossIndustryInvoice`) into a flat header plus its source lines.
  *
@@ -471,7 +493,9 @@ const parseCii = (root: XmlObject): ReceivedInvoice => {
  * @returns The parsed header; every amount is a decimal string or null.
  * @throws {AnafValidationError} The document exceeds the size guard, or its
  *   root element is not a supported invoice root.
- * @throws {AnafXmlParsingError} The document is not well-formed XML.
+ * @throws {AnafXmlParsingError} The document is not well-formed XML, declares
+ *   an external entity, or names an element with a reserved JavaScript
+ *   property name.
  * @throws {AnafAmbiguousTaxTotalError} The document carries several VAT
  *   totals and none of them uniquely matches the document currency.
  */
@@ -485,7 +509,7 @@ export function parseReceivedInvoice(xml: string): ReceivedInvoice {
     throw new AnafXmlParsingError(`Received document is not well-formed XML: ${validation.err.msg}`);
   }
 
-  const parsed = objectOf(parser.parse(xml));
+  const parsed = objectOf(parseXml(xml));
   if (parsed === null) {
     throw new AnafValidationError('Unsupported document root: unknown');
   }
