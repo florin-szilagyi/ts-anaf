@@ -208,16 +208,31 @@ invoice.sourceLines; // one ReceivedInvoiceLine per document line
 invoice.sourceLineDiagnostics; // human-readable notes for malformed/absent line facts
 ```
 
-The parser refuses to guess. It throws `AnafValidationError` for an oversized
-document or an unsupported root element, `AnafXmlParsingError` for XML that is
-not well-formed, and `AnafAmbiguousTaxTotalError` when a document carries
-several VAT totals and none of them uniquely matches the document currency.
+**Every header field is nullable.** `invoiceNumber`, `issueDate`,
+`totalAmount` and the rest come back as `null` when the document does not
+publish them or publishes them in a form that does not validate — the parser
+never substitutes a default. Check the fields your own flow depends on before
+using them.
+
+The parser refuses to guess. It throws:
+
+- `AnafValidationError` — the document is oversized (12 MB of UTF-8) or its
+  root element is not a recognised invoice root.
+- `AnafXmlParsingError` — the XML is not well-formed, declares an external
+  entity (`<!ENTITY x SYSTEM ...>`, even unreferenced), or names an element
+  with a reserved JavaScript property name such as `__proto__`.
+- `AnafAmbiguousTaxTotalError` — the document carries several VAT totals and
+  none of them uniquely matches the document currency.
+
 Fields it cannot read as a valid decimal, date or currency come back as `null`
 rather than coerced, and unreadable line facts are reported in
 `sourceLineDiagnostics` while the line itself is kept.
 
-XML entity expansion stays disabled (these documents are supplier-authored),
-with only the five predefined XML entities decoded.
+General and DTD entity expansion stays disabled (these documents are
+supplier-authored, and a recursive entity definition would balloon memory).
+The five predefined XML entities and decimal/hex character references — the
+way Romanian diacritics usually arrive — are decoded, exactly one level deep:
+`&#38;amp;` is the literal text `&amp;`, never `&`.
 
 ## AnafDetailsClient Configuration
 

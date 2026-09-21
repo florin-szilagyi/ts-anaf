@@ -28,8 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throws. `documentKind` distinguishes invoice, credit note and corrective
   (384) documents, keeping an unrecognized UNTDID 1001 code verbatim, and
   `pdfStandard` reports which converter (`FACT1`/`FCN`) the document needs.
-  XML entity expansion stays disabled for these supplier-authored documents,
-  with only the five predefined XML entities decoded.
+  Every header field is nullable and must be checked by the caller.
+
+  The five predefined XML entities and decimal/hex character references
+  (`&#259;`, `&#x103;` — how Romanian diacritics usually arrive) are decoded,
+  exactly one level deep. General and DTD entity expansion stays disabled for
+  these supplier-authored documents: an undefined or declared entity reference
+  passes through verbatim, and a document declaring an external entity
+  (`<!ENTITY x SYSTEM ...>`, even unreferenced) or naming an element with a
+  reserved JavaScript property name (`__proto__`, `constructor`) is refused
+  with `AnafXmlParsingError`. The size ceiling is measured in bytes of UTF-8.
 
 - **`AnafAmbiguousTaxTotalError`** — thrown when a received document carries
   several VAT totals and none of them uniquely matches the document currency.
@@ -38,10 +46,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New exported types: `ReceivedInvoice`, `ReceivedInvoiceLine`,
   `ReceivedSupplierAddress`.
 
+### Fixed
+
+- **`extractInvoiceXml`** now recognises `CrossIndustryInvoice` as an invoice
+  root. A CII document arriving in an archive alongside another non-signature
+  XML could previously lose the selection to that other entry.
+
 ### Changed
 
 - `fast-xml-parser` is now a runtime dependency of the SDK (it backs the
   received-invoice parser).
+- **`engines.node` is now `>=20.0.0`** (was `>=14.0.0`). The declared floor no
+  longer matched reality: the workspace already requires Node 20, the publish
+  workflow builds on Node 24, and the dependency tree needs Node 16 at minimum.
+  The equally stale `engines.npm` entry was dropped.
 
 ## [1.6.0] - 2026-09-05
 
