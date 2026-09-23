@@ -219,8 +219,8 @@ The parser refuses to guess. It throws:
 - `AnafValidationError` — the document is oversized (12 MB of UTF-8) or its
   root element is not a recognised invoice root.
 - `AnafXmlParsingError` — the XML is not well-formed, declares an external
-  entity (`<!ENTITY x SYSTEM ...>`, even unreferenced), or names an element
-  with a reserved JavaScript property name such as `__proto__`.
+  entity in its DTD (even an unreferenced one), or names an element with a
+  reserved JavaScript property name such as `__proto__`.
 - `AnafAmbiguousTaxTotalError` — the document carries several VAT totals and
   none of them uniquely matches the document currency.
 
