@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `batchGetCompanyData` rejects more than 100 CUIs (the ANAF limit) instead of sending them.
 - A CUI must be 2 to 10 digits with an optional `RO` prefix, which may be followed by spaces
   (`"RO 123"`). `"12abc"` is now invalid instead of being read as `12`.
-- `enrichMessagesWithCompanyData` looks up emitters in sequential batches of 100.
+- `enrichMessagesWithCompanyData` throws for more than 100 unique emitters.
 
 ### Fixed
 
