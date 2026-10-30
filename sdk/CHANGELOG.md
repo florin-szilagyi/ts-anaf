@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-30
+
+### Fixed
+
+- The SDK builds with TypeScript 5.9: `EfacturaToolsClient` wraps uploaded Buffers in a `Uint8Array` before creating the `Blob`. The uploaded bytes are unchanged.
+
 ## [2.0.0] - 2026-10-30
 
 ### Breaking
