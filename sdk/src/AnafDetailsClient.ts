@@ -95,8 +95,8 @@ export class AnafDetailsClient {
       return null;
     }
 
-    // A CUI has at most 10 digits, which also keeps it a safe integer
-    const match = /^(?:RO\s*)?(\d{1,10})$/i.exec(vatCode.trim());
+    // A CUI has 2 to 10 digits (the last one is a check digit), which also keeps it a safe integer
+    const match = /^(?:RO\s*)?(\d{2,10})$/i.exec(vatCode.trim());
     const cuiNumber = match ? Number(match[1]) : 0;
 
     return cuiNumber > 0 ? cuiNumber : null;
@@ -241,11 +241,6 @@ export class AnafDetailsClient {
 
     // Validate each VAT code and build payload
     for (const vatCode of vatCodes) {
-      if (!vatCode || vatCode.trim().length < 2) {
-        invalidCodes.push(vatCode);
-        continue;
-      }
-
       const cuiNumber = this.extractCuiNumber(vatCode);
       if (!cuiNumber) {
         invalidCodes.push(vatCode);
@@ -348,11 +343,7 @@ export class AnafDetailsClient {
    * ```
    */
   async isValidVatCode(vatCode: string): Promise<boolean> {
-    if (!vatCode) return false;
-
-    const cleanVatCode = vatCode.trim().replace(/^RO\s*/i, '');
-
-    return cleanVatCode.length >= 2 && this.extractCuiNumber(vatCode) !== null;
+    return this.extractCuiNumber(vatCode) !== null;
   }
 
   // ─── Async API methods ──────────────────────────────────────────────────────
@@ -411,11 +402,6 @@ export class AnafDetailsClient {
     const invalidCodes: string[] = [];
 
     for (const vatCode of vatCodes) {
-      if (!vatCode || vatCode.trim().length < 2) {
-        invalidCodes.push(vatCode);
-        continue;
-      }
-
       const cuiNumber = this.extractCuiNumber(vatCode);
       if (!cuiNumber) {
         invalidCodes.push(vatCode);

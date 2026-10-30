@@ -550,6 +550,7 @@ describe('AnafDetailsClient Unit Tests', () => {
       expect(sentBody()[0].cui).toBe(123);
       expect(await client.isValidVatCode('RO 123')).toBe(true);
       expect(await client.isValidVatCode('RO 1')).toBe(false);
+      expect((await client.batchGetCompanyData(['RO1'])).error).toBe('All 1 provided VAT code(s) are invalid.');
     });
   });
 
