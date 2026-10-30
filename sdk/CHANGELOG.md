@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-30
+
+### Breaking
+
+- `batchGetCompanyData` rejects more than 100 CUIs per call. Callers batch their own requests.
+- A CUI string must be digits with an optional `RO` prefix. Inputs like `"12abc"` are rejected.
+- `AnafApiResponse.notFound` is `number[]`.
+
 ### Added
 
 - **`batchGetCompanyData(vatCodes, options?)`** takes `{ date?, includeEfacturaRegistry? }`.
