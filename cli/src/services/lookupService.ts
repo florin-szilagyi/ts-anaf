@@ -91,9 +91,8 @@ export class LookupService {
       missing.push(cui);
     }
 
-    // ANAF accepts at most 100 CUIs per request; one request at a time, never in parallel
-    for (let i = 0; i < missing.length; i += 100) {
-      const fetched = await this.client.batchGetCompanyData(missing.slice(i, i + 100));
+    if (missing.length > 0) {
+      const fetched = await this.client.batchGetCompanyData(missing);
       if (!fetched.success) {
         const sdkError = fetched.error ?? 'Unknown ANAF lookup failure';
         throw new CliError({

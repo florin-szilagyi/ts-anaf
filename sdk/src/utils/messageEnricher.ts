@@ -4,12 +4,13 @@ import type { MessageDetails } from '../types';
 /**
  * Enrich messages that have a `cif_emitent` field with the emitter's company name.
  *
- * Collects all unique emitter CUIs, looks them up via
- * `AnafDetailsClient.batchGetCompanyData` in sequential batches of 100, and
- * sets `emitentName` on each message where a match is found.
+ * Collects all unique emitter CUIs, performs a single batch lookup via
+ * `AnafDetailsClient.batchGetCompanyData`, and sets `emitentName` on each
+ * message where a match is found.
  *
  * Graceful degradation: if the batch lookup fails, the original response
- * is returned unchanged (no `emitentName` fields).
+ * is returned unchanged (no `emitentName` fields). More than 100 unique
+ * emitters throws instead, so the caller can batch its own requests.
  */
 export async function enrichMessagesWithCompanyData<T extends { mesaje?: MessageDetails[] }>(
   response: T,
@@ -27,18 +28,20 @@ export async function enrichMessagesWithCompanyData<T extends { mesaje?: Message
     return response;
   }
 
+  if (uniqueCuis.length > 100) {
+    throw new Error('Maximum 100 CUI codes per request.');
+  }
+
   try {
+    const result = await detailsClient.batchGetCompanyData(uniqueCuis);
+    // ANAF found none of the CUIs: an answer, not a failure
+    if (!result.success && !result.notFound) {
+      return response;
+    }
+
     const nameMap = new Map<string, string>();
-    // ANAF accepts at most 100 CUIs per request; one request at a time, never in parallel
-    for (let i = 0; i < uniqueCuis.length; i += 100) {
-      const result = await detailsClient.batchGetCompanyData(uniqueCuis.slice(i, i + 100));
-      // A batch where ANAF found none of the CUIs is an answer, not a failure
-      if (!result.success && !result.notFound) {
-        return response;
-      }
-      for (const company of result.data ?? []) {
-        nameMap.set(company.vatCode, company.name);
-      }
+    for (const company of result.data ?? []) {
+      nameMap.set(company.vatCode, company.name);
     }
 
     return {
