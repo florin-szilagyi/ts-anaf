@@ -110,7 +110,12 @@ describe('enrichMessagesWithCompanyData', () => {
       contactPhone: '',
       scpTva: true,
     });
+    let inFlight = 0;
+    let maxInFlight = 0;
     client.batchGetCompanyData.mockImplementation(async (cuis: string[]) => {
+      maxInFlight = Math.max(maxInFlight, ++inFlight);
+      await new Promise((resolve) => setImmediate(resolve));
+      inFlight -= 1;
       if (cuis.includes('1100')) return { success: false, error: 'Companies not found', notFound: [1100] };
       return { success: true, data: cuis.map(company) };
     });
@@ -122,8 +127,20 @@ describe('enrichMessagesWithCompanyData', () => {
     );
 
     expect(client.batchGetCompanyData.mock.calls.map(([batch]) => batch.length)).toEqual([100, 100, 1]);
+    expect(maxInFlight).toBe(1);
     expect(result.mesaje![0].emitentName).toBe('N1000');
     expect(result.mesaje![100].emitentName).toBeUndefined();
     expect(result.mesaje![200].emitentName).toBe('N1200');
+  });
+
+  it('returns original response when a later batch fails', async () => {
+    client.batchGetCompanyData
+      .mockResolvedValueOnce({ success: true, data: [] })
+      .mockResolvedValueOnce({ success: false, error: 'simulated failure' });
+    const response = {
+      mesaje: Array.from({ length: 101 }, (_, i) => makeMessage({ cif_emitent: String(1000 + i) })),
+    };
+
+    expect(await enrichMessagesWithCompanyData(response, client)).toBe(response);
   });
 });

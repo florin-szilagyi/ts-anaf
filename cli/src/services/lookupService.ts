@@ -200,5 +200,8 @@ export class LookupService {
 }
 
 function normalizeCui(cui: string): string {
-  return cui.trim().toUpperCase().replace(/^RO/i, '');
+  return cui
+    .trim()
+    .toUpperCase()
+    .replace(/^RO\s*/i, '');
 }
