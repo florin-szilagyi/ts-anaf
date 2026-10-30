@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`batchGetCompanyData(vatCodes, options?)`** takes `{ date?, includeEfacturaRegistry? }`.
+  `date` (`YYYY-MM-DD`) is sent to ANAF instead of today's local date.
+  `includeEfacturaRegistry: false` sends only the PlatitorTvaRest v9 request, without the
+  parallel e-Factura registry request.
+- `AnafCompanyData.caenCode`: the main CAEN code (`date_generale.cod_CAEN`).
+- `AnafCompanyResult.notFound`: the CUIs ANAF did not find, also when none were found
+  (ANAF then answers HTTP 404).
+- `AnafCompanyResult.statusCode`, `retryAfter` and `retryable` on a failed lookup.
+  `retryable` is `true` for 429, 5xx, timeouts and network errors.
+- `AnafSdkError.statusCode` and `AnafSdkError.retryAfter` on every HTTP error from the SDK.
+
+### Changed
+
+- `batchGetCompanyData` rejects more than 100 CUIs (the ANAF limit) instead of sending them.
+- A CUI must be 2 to 10 digits with an optional `RO` prefix, which may be followed by spaces
+  (`"RO 123"`). `"12abc"` is now invalid instead of being read as `12`.
+- `enrichMessagesWithCompanyData` looks up emitters in sequential batches of 100.
+
+### Fixed
+
+- `AnafApiResponse.notFound` is `number[]`, the shape ANAF sends.
+
 ## [1.7.0] - 2026-09-21
 
 ### Added

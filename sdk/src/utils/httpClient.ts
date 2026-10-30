@@ -3,6 +3,7 @@ import {
   AnafAuthenticationError,
   AnafNotFoundError,
   AnafRateLimitError,
+  AnafSdkError,
   AnafValidationError,
 } from '../errors';
 import { tryCatch } from '../tryCatch';
@@ -57,7 +58,7 @@ export class HttpClient {
       // Handle HTTP errors
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
-        this.handleHttpError(response.status, response.statusText, errorText);
+        this.handleHttpError(response.status, response.statusText, errorText, response.headers?.get('retry-after'));
       }
 
       // Parse response based on content type
@@ -155,19 +156,23 @@ export class HttpClient {
   /**
    * Handle HTTP error status codes
    */
-  private handleHttpError(status: number, statusText: string, errorText: string): never {
+  private handleHttpError(status: number, statusText: string, errorText: string, retryAfter?: string | null): never {
     const message = `HTTP ${status}: ${statusText}${errorText ? ` - ${errorText}` : ''}`;
 
+    let error: AnafSdkError;
     if (status === 401 || status === 403) {
-      throw new AnafAuthenticationError(message);
+      error = new AnafAuthenticationError(message);
     } else if (status === 404) {
-      throw new AnafNotFoundError(message);
+      error = new AnafNotFoundError(message, errorText);
     } else if (status === 429) {
-      throw new AnafRateLimitError();
+      error = new AnafRateLimitError();
     } else if (status >= 400 && status < 500) {
-      throw new AnafValidationError(message);
+      error = new AnafValidationError(message);
     } else {
-      throw new AnafApiError(message, status, errorText);
+      error = new AnafApiError(message, status, errorText);
     }
+    error.statusCode = status;
+    error.retryAfter = retryAfter ?? undefined;
+    throw error;
   }
 }

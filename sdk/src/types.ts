@@ -597,6 +597,8 @@ export interface AnafCompanyData {
   contactPhone: string;
   /** Whether company is VAT registered */
   scpTva: boolean;
+  /** Main CAEN (activity) code, as ANAF sends it */
+  caenCode?: string;
   /** e-Factura registry information (if available) */
   efacturaRegistry?: {
     /** Whether the company is registered in the e-Factura registry */
@@ -626,8 +628,26 @@ export interface AnafCompanyResult {
   success: boolean;
   /** Company data if found */
   data?: AnafCompanyData[];
+  /** CUIs that ANAF reported as not found */
+  notFound?: number[];
   /** Error message if lookup failed */
   error?: string;
+  /** HTTP status of the failed ANAF request, when there was a response */
+  statusCode?: number;
+  /** `Retry-After` header of the failed ANAF request, as sent */
+  retryAfter?: string;
+  /** Whether the same request can succeed later (429, 5xx, timeout, network error) */
+  retryable?: boolean;
+}
+
+/**
+ * Options for a sync company lookup
+ */
+export interface AnafCompanyLookupOptions {
+  /** Request date sent to ANAF, `YYYY-MM-DD` (default: today on the local clock) */
+  date?: string;
+  /** Also query the e-Factura registry in parallel (default: true) */
+  includeEfacturaRegistry?: boolean;
 }
 
 /**
@@ -648,6 +668,7 @@ export interface AnafCompanyInfo {
   nrRegCom: string;
   telefon: string;
   codPostal: string | null;
+  cod_CAEN: string;
 }
 
 /**
@@ -670,7 +691,7 @@ export interface AnafFoundCompany {
  */
 export interface AnafApiResponse {
   found?: AnafFoundCompany[];
-  notFound?: { cui: number }[];
+  notFound?: number[];
 }
 
 // ─── Async ANAF API types (v8) ───────────────────────────────────────────────

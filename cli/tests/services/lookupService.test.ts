@@ -42,7 +42,7 @@ class FakeClient {
     }
     return {
       success: true,
-      data: cuis.map((c) => ({ ...fakeCompany, vatCode: c.replace(/^RO/i, '') })),
+      data: cuis.map((c) => ({ ...fakeCompany, vatCode: c.trim().replace(/^RO\s*/i, '') })),
     };
   }
 
@@ -160,6 +160,35 @@ describe('LookupService.batchGetCompanies', () => {
     expect(results).toHaveLength(2);
     expect(results[0].vatCode).toBe('12345678');
     expect(results[1].vatCode).toBe('87654321');
+  });
+
+  it('fetches more than 100 CUIs in sequential batches of 100', async () => {
+    const client = new FakeClient();
+    const batchSizes: number[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const original = client.batchGetCompanyData.bind(client);
+    client.batchGetCompanyData = async (cuis: string[]) => {
+      batchSizes.push(cuis.length);
+      maxInFlight = Math.max(maxInFlight, ++inFlight);
+      await new Promise((resolve) => setImmediate(resolve));
+      inFlight -= 1;
+      return original(cuis);
+    };
+    const svc = new LookupService({ client: client as never, paths: freshPaths() });
+    const cuis = Array.from({ length: 101 }, (_, i) => String(10000000 + i));
+
+    const results = await svc.batchGetCompanies(cuis);
+
+    expect(batchSizes).toEqual([100, 1]);
+    expect(maxInFlight).toBe(1);
+    expect(results.map((r) => r.vatCode)).toEqual(cuis);
+  });
+
+  it('matches a CUI written with a space after RO', async () => {
+    const svc = new LookupService({ client: new FakeClient() as never, paths: freshPaths() });
+    const results = await svc.batchGetCompanies(['RO 12345678']);
+    expect(results[0].vatCode).toBe('12345678');
   });
 
   it('serves from cache when all CUIs are cached and only fetches misses', async () => {
