@@ -1,4 +1,9 @@
 export class AnafSdkError extends Error {
+  /** HTTP status, when the error comes from an HTTP response */
+  public statusCode?: number;
+  /** `Retry-After` header of that response, as sent */
+  public retryAfter?: string;
+
   constructor(message: string) {
     super(message);
     this.name = this.constructor.name;
@@ -14,8 +19,11 @@ export class AnafValidationError extends AnafSdkError {
 }
 
 export class AnafNotFoundError extends AnafSdkError {
-  constructor(message: string) {
+  public responseBody?: string;
+
+  constructor(message: string, responseBody?: string) {
     super(message);
+    this.responseBody = responseBody;
     Object.setPrototypeOf(this, AnafNotFoundError.prototype);
   }
 }
@@ -28,7 +36,6 @@ export class AnafAuthenticationError extends AnafSdkError {
 }
 
 export class AnafApiError extends AnafSdkError {
-  public statusCode?: number;
   public details?: any;
 
   constructor(message: string, statusCode?: number, details?: any) {

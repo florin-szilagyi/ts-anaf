@@ -87,6 +87,7 @@ describe('AnafDetailsClient Unit Tests', () => {
             nrRegCom: 'J40/1234/2020',
             telefon: '0212345678',
             codPostal: '010101',
+            cod_CAEN: '6201',
           },
           inregistrare_scop_Tva: {
             scpTVA: true,
@@ -96,7 +97,7 @@ describe('AnafDetailsClient Unit Tests', () => {
     };
 
     const mockNotFoundResponse: AnafApiResponse = {
-      notFound: [{ cui: 99999999 }],
+      notFound: [99999999],
     };
 
     test('should fetch company data with e-Factura registry info', async () => {
@@ -115,6 +116,7 @@ describe('AnafDetailsClient Unit Tests', () => {
         postalCode: '010101',
         contactPhone: '0212345678',
         scpTva: true,
+        caenCode: '6201',
         efacturaRegistry: {
           registered: true,
           registru: 'RO e-Factura',
@@ -235,6 +237,7 @@ describe('AnafDetailsClient Unit Tests', () => {
             nrRegCom: 'J40/1111/2020',
             telefon: '0211111111',
             codPostal: '010101',
+            cod_CAEN: '6201',
           },
           inregistrare_scop_Tva: { scpTVA: true },
         },
@@ -251,6 +254,7 @@ describe('AnafDetailsClient Unit Tests', () => {
             nrRegCom: 'J40/2222/2020',
             telefon: '0212222222',
             codPostal: '020202',
+            cod_CAEN: '6201',
           },
           inregistrare_scop_Tva: { scpTVA: false },
         },
@@ -258,7 +262,7 @@ describe('AnafDetailsClient Unit Tests', () => {
     };
 
     const mockNotFound: AnafApiResponse = {
-      notFound: [{ cui: 99999999 }],
+      notFound: [99999999],
     };
 
     test('should batch fetch multiple companies with registry data', async () => {
@@ -272,6 +276,7 @@ describe('AnafDetailsClient Unit Tests', () => {
               nrRegCom: 'J40/1234/2020',
               telefon: '0211111111',
               codPostal: '010101',
+              cod_CAEN: '6201',
             },
             inregistrare_scop_Tva: { scpTVA: true },
           },
@@ -283,6 +288,7 @@ describe('AnafDetailsClient Unit Tests', () => {
               nrRegCom: 'J40/5678/2020',
               telefon: '0222222222',
               codPostal: '020202',
+              cod_CAEN: '6201',
             },
             inregistrare_scop_Tva: { scpTVA: false },
           },
@@ -339,6 +345,7 @@ describe('AnafDetailsClient Unit Tests', () => {
               nrRegCom: 'J40/123/2020',
               telefon: '0211234567',
               codPostal: null,
+              cod_CAEN: '6201',
             },
             inregistrare_scop_Tva: { scpTVA: false },
           },
@@ -371,6 +378,7 @@ describe('AnafDetailsClient Unit Tests', () => {
               nrRegCom: '',
               telefon: '',
               codPostal: null,
+              cod_CAEN: '6201',
             },
             inregistrare_scop_Tva: { scpTVA: false },
           },
@@ -390,6 +398,148 @@ describe('AnafDetailsClient Unit Tests', () => {
       expect(result.data?.[0]?.postalCode).toBe(null);
       expect(result.data?.[0]?.scpTva).toBe(false);
       expect(result.data?.[0]?.efacturaRegistry?.registered).toBe(false);
+    });
+  });
+
+  describe('Bulk lookup (sync v9)', () => {
+    const found = (cui: number, codCaen: string): AnafApiResponse['found'] => [
+      {
+        date_generale: {
+          cui,
+          denumire: `Company ${cui} SRL`,
+          adresa: 'Address',
+          nrRegCom: 'J40/1/2020',
+          telefon: '',
+          codPostal: null,
+          cod_CAEN: codCaen,
+        },
+        inregistrare_scop_Tva: { scpTVA: true },
+      },
+    ];
+
+    const mockErrorResponse = (status: number, statusText: string, body: string, retryAfter?: string) => ({
+      ok: false,
+      status,
+      statusText,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'retry-after' ? (retryAfter ?? null) : null),
+      },
+      text: () => Promise.resolve(body),
+    });
+
+    const sentBody = (call = 0) => JSON.parse((fetch as jest.Mock).mock.calls[call][1].body);
+
+    test('returns the main CAEN code', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({ found: found(12345678, '6201'), notFound: [] }));
+
+      const result = await client.batchGetCompanyData(['RO12345678'], { includeEfacturaRegistry: false });
+
+      expect(result.data?.[0]?.caenCode).toBe('6201');
+    });
+
+    test('returns found companies and not-found CUIs together', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse({ found: found(12345678, '6201'), notFound: [99999999] })
+      );
+
+      const result = await client.batchGetCompanyData(['12345678', '99999999'], { includeEfacturaRegistry: false });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.map((c) => c.vatCode)).toEqual(['12345678']);
+      expect(result.notFound).toEqual([99999999]);
+    });
+
+    test('returns the not-found CUIs when ANAF answers 404 because none exist', async () => {
+      const body = JSON.stringify({ cod: 404, message: 'NOT_FOUND', found: [], notFound: [1, 2] });
+      (fetch as jest.Mock).mockResolvedValueOnce(mockErrorResponse(404, 'Not Found', body));
+
+      const result = await client.batchGetCompanyData(['RO11', 'RO22'], { includeEfacturaRegistry: false });
+
+      expect(result).toMatchObject({ success: false, notFound: [1, 2], statusCode: 404, retryable: false });
+    });
+
+    test('does not invent not-found CUIs when the 404 body is not the ANAF list', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce(mockErrorResponse(404, 'Not Found', '<html>Not Found</html>'));
+
+      const result = await client.batchGetCompanyData(['RO11'], { includeEfacturaRegistry: false });
+
+      expect(result).toMatchObject({ success: false, statusCode: 404, retryable: false });
+      expect(result.notFound).toBeUndefined();
+    });
+
+    test('sends exactly one request to v9 when the registry is not wanted', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({ found: found(12345678, '6201'), notFound: [] }));
+
+      const result = await client.batchGetCompanyData(['RO12345678'], { includeEfacturaRegistry: false });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith('https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva', expect.anything());
+      expect(result.data?.[0]?.efacturaRegistry).toBeUndefined();
+    });
+
+    test('exposes status and Retry-After on 429 and marks it retryable', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce(mockErrorResponse(429, 'Too Many Requests', '', '5'));
+
+      const result = await client.batchGetCompanyData(['RO12345678'], { includeEfacturaRegistry: false });
+
+      expect(result).toMatchObject({ success: false, statusCode: 429, retryAfter: '5', retryable: true });
+    });
+
+    test('marks 5xx and network errors retryable and other 4xx final', async () => {
+      (fetch as jest.Mock)
+        .mockResolvedValueOnce(mockErrorResponse(503, 'Service Unavailable', 'down'))
+        .mockRejectedValueOnce(new Error('fetch failed'))
+        .mockResolvedValueOnce(mockErrorResponse(400, 'Bad Request', 'bad'));
+      const opts = { includeEfacturaRegistry: false };
+
+      expect(await client.batchGetCompanyData(['RO12345678'], opts)).toMatchObject({
+        statusCode: 503,
+        retryable: true,
+      });
+      expect(await client.batchGetCompanyData(['RO12345678'], opts)).toMatchObject({
+        statusCode: undefined,
+        retryable: true,
+      });
+      expect(await client.batchGetCompanyData(['RO12345678'], opts)).toMatchObject({
+        statusCode: 400,
+        retryable: false,
+      });
+    });
+
+    test('rejects more than 100 CUIs without calling ANAF, and sends 100 in one request', async () => {
+      const cuis = Array.from({ length: 101 }, (_, i) => String(1000 + i));
+
+      const result = await client.batchGetCompanyData(cuis);
+
+      expect(result).toEqual({ success: false, error: 'Maximum 100 CUI codes per request.' });
+      expect(fetch).not.toHaveBeenCalled();
+
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({ found: [], notFound: [] }));
+      await client.batchGetCompanyData(cuis.slice(0, 100), { includeEfacturaRegistry: false });
+      expect(sentBody()).toHaveLength(100);
+    });
+
+    test('sends the caller-set request date', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({ found: found(12345678, '6201'), notFound: [] }));
+
+      await client.batchGetCompanyData(['RO12345678'], { date: '2025-01-31', includeEfacturaRegistry: false });
+
+      expect(sentBody()).toEqual([{ cui: 12345678, data: '2025-01-31' }]);
+    });
+
+    test('rejects a malformed or impossible request date without calling ANAF', async () => {
+      for (const date of ['31.01.2025', '2025-02-30', '2025-13-01']) {
+        expect((await client.batchGetCompanyData(['RO12345678'], { date })).success).toBe(false);
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('rejects CUIs that are not digits after an optional RO prefix', async () => {
+      const result = await client.batchGetCompanyData(['12abc', 'RO12 34', '1.5e3']);
+
+      expect(result).toEqual({ success: false, error: 'All 3 provided VAT code(s) are invalid.' });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(await client.isValidVatCode('12abc')).toBe(false);
     });
   });
 

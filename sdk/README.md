@@ -175,6 +175,20 @@ if (batchResult.success) {
   console.error('Batch error:', batchResult.error);
 }
 
+// Bulk lookup: max 100 CUIs, a fixed request date, no e-Factura registry request
+const bulk = await detailsClient.batchGetCompanyData(['12345678', '87654321'], {
+  date: '2026-01-31',
+  includeEfacturaRegistry: false,
+});
+if (bulk.success) {
+  bulk.data.forEach((company) => console.log(company.vatCode, company.caenCode));
+  console.log('Not found:', bulk.notFound);
+} else if (bulk.retryable) {
+  console.log('Retry later', bulk.statusCode, bulk.retryAfter);
+} else {
+  console.log('Final answer:', bulk.error, bulk.notFound);
+}
+
 // Configuration options
 const customClient = new AnafDetailsClient({
   timeout: 60000, // 60 second timeout

@@ -25,11 +25,12 @@
 
 import { HttpClient } from './utils/httpClient';
 import { tryCatch } from './tryCatch';
-import { AnafNotFoundError } from './errors';
+import { AnafNotFoundError, AnafSdkError } from './errors';
 import {
   AnafDetailsConfig,
   AnafCompanyData,
   AnafCompanyResult,
+  AnafCompanyLookupOptions,
   AnafRequestPayload,
   AnafApiResponse,
   AnafAsyncSubmitResponse,
@@ -94,15 +95,11 @@ export class AnafDetailsClient {
       return null;
     }
 
-    // Remove RO prefix if present and extract numeric part
-    const cuiString = vatCode.trim().toUpperCase().replace(/^RO/i, '');
-    const cuiNumber = parseInt(cuiString, 10);
+    // A CUI has at most 10 digits, which also keeps it a safe integer
+    const match = /^(?:RO)?(\d{1,10})$/i.exec(vatCode.trim());
+    const cuiNumber = match ? Number(match[1]) : 0;
 
-    if (isNaN(cuiNumber) || cuiNumber <= 0) {
-      return null;
-    }
-
-    return cuiNumber;
+    return cuiNumber > 0 ? cuiNumber : null;
   }
 
   /**
@@ -138,6 +135,7 @@ export class AnafDetailsClient {
           postalCode: element.date_generale.codPostal,
           contactPhone: element.date_generale.telefon,
           scpTva: element.inregistrare_scop_Tva.scpTVA || false,
+          caenCode: element.date_generale.cod_CAEN,
         };
 
         if (registryEntry) {
@@ -164,6 +162,7 @@ export class AnafDetailsClient {
       return {
         success: true,
         data,
+        notFound: response.notFound ?? [],
       };
     }
 
@@ -171,6 +170,7 @@ export class AnafDetailsClient {
       return {
         success: false,
         error: 'Company not found for the provided VAT code.',
+        notFound: response.notFound,
       };
     } else {
       return {
@@ -205,7 +205,8 @@ export class AnafDetailsClient {
   /**
    * Batch fetch company data for multiple VAT codes
    *
-   * @param vatCodes - Array of VAT codes to fetch
+   * @param vatCodes - Array of VAT codes to fetch (max 100)
+   * @param options - Request date, and whether to also query the e-Factura registry
    * @returns Promise with company data or error
    *
    * @example
@@ -220,13 +221,21 @@ export class AnafDetailsClient {
    * }
    * ```
    */
-  async batchGetCompanyData(vatCodes: string[]): Promise<AnafCompanyResult> {
+  async batchGetCompanyData(vatCodes: string[], options: AnafCompanyLookupOptions = {}): Promise<AnafCompanyResult> {
     // Basic validation
     if (!vatCodes || vatCodes.length === 0) {
       return { success: false, error: 'No VAT codes provided.' };
     }
 
-    const requestDate = this.getCurrentDateString();
+    if (vatCodes.length > 100) {
+      return { success: false, error: 'Maximum 100 CUI codes per request.' };
+    }
+
+    if (options.date !== undefined && !this.isCalendarDate(options.date)) {
+      return { success: false, error: `Invalid request date "${options.date}", expected YYYY-MM-DD.` };
+    }
+
+    const requestDate = options.date ?? this.getCurrentDateString();
     const validatedPayload: AnafRequestPayload[] = [];
     const invalidCodes: string[] = [];
 
@@ -261,29 +270,43 @@ export class AnafDetailsClient {
     // Fire both API calls in parallel — registry failure should not block company data
     const [companyResult, registryResult] = await Promise.allSettled([
       this.httpClient.post<AnafApiResponse>(this.config.url, validatedPayload, { headers }),
-      this.httpClient.post<EFacturaRegistryResponse>(this.config.efacturaRegistryUrl, validatedPayload, { headers }),
+      options.includeEfacturaRegistry === false
+        ? Promise.resolve(null)
+        : this.httpClient.post<EFacturaRegistryResponse>(this.config.efacturaRegistryUrl, validatedPayload, {
+            headers,
+          }),
     ]);
 
     // Handle company data response (primary)
     if (companyResult.status === 'rejected') {
       const error = companyResult.reason;
+      const statusCode = error instanceof AnafSdkError ? error.statusCode : undefined;
+      const failure = {
+        success: false,
+        statusCode,
+        retryAfter: error instanceof AnafSdkError ? error.retryAfter : undefined,
+        // No status means a timeout or a network error
+        retryable: statusCode === undefined || statusCode === 429 || statusCode >= 500,
+      };
 
       if (error instanceof AnafNotFoundError) {
+        // ANAF answers 404 when none of the CUIs exist, with the usual body listing them
         return {
-          success: false,
+          ...failure,
           error: 'Companies not found for the provided VAT codes.',
+          notFound: this.parseNotFound(error.responseBody),
         };
       }
 
       if (error.message?.includes('fetch') || error.message?.toLowerCase().includes('network')) {
         return {
-          success: false,
+          ...failure,
           error: 'Network error: Could not connect to ANAF service.',
         };
       }
 
       return {
-        success: false,
+        ...failure,
         error: 'An unexpected error occurred while contacting the ANAF service.',
       };
     }
@@ -301,6 +324,17 @@ export class AnafDetailsClient {
     return this.transformResponse(companyResult.value.data, registryData);
   }
 
+  private isCalendarDate(date: string): boolean {
+    const time = Date.parse(`${date}T00:00:00Z`);
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(time) && new Date(time).toISOString().startsWith(date);
+  }
+
+  private parseNotFound(body: string | undefined): number[] | undefined {
+    const { data } = tryCatch(() => JSON.parse(body ?? '') as { notFound?: unknown });
+    const notFound = data?.notFound;
+    return Array.isArray(notFound) && notFound.every((cui) => typeof cui === 'number') ? notFound : undefined;
+  }
+
   /**
    * Validate if a VAT code is in the correct format for ANAF lookup
    *
@@ -316,11 +350,9 @@ export class AnafDetailsClient {
   async isValidVatCode(vatCode: string): Promise<boolean> {
     if (!vatCode) return false;
 
-    // Remove RO prefix if present and check if remaining is numeric
     const cleanVatCode = vatCode.trim().toUpperCase().replace(/^RO/i, '');
-    const cuiNumber = parseInt(cleanVatCode, 10);
 
-    return !isNaN(cuiNumber) && cleanVatCode.length >= 2 && cleanVatCode.length <= 10 && cuiNumber > 0;
+    return cleanVatCode.length >= 2 && this.extractCuiNumber(vatCode) !== null;
   }
 
   // ─── Async API methods ──────────────────────────────────────────────────────
