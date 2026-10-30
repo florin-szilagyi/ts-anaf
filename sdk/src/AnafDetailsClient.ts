@@ -96,7 +96,7 @@ export class AnafDetailsClient {
     }
 
     // A CUI has at most 10 digits, which also keeps it a safe integer
-    const match = /^(?:RO)?(\d{1,10})$/i.exec(vatCode.trim());
+    const match = /^(?:RO\s*)?(\d{1,10})$/i.exec(vatCode.trim());
     const cuiNumber = match ? Number(match[1]) : 0;
 
     return cuiNumber > 0 ? cuiNumber : null;
@@ -350,7 +350,7 @@ export class AnafDetailsClient {
   async isValidVatCode(vatCode: string): Promise<boolean> {
     if (!vatCode) return false;
 
-    const cleanVatCode = vatCode.trim().toUpperCase().replace(/^RO/i, '');
+    const cleanVatCode = vatCode.trim().replace(/^RO\s*/i, '');
 
     return cleanVatCode.length >= 2 && this.extractCuiNumber(vatCode) !== null;
   }

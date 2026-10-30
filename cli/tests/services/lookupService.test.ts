@@ -162,6 +162,23 @@ describe('LookupService.batchGetCompanies', () => {
     expect(results[1].vatCode).toBe('87654321');
   });
 
+  it('fetches more than 100 CUIs in sequential batches of 100', async () => {
+    const client = new FakeClient();
+    const batchSizes: number[] = [];
+    const original = client.batchGetCompanyData.bind(client);
+    client.batchGetCompanyData = async (cuis: string[]) => {
+      batchSizes.push(cuis.length);
+      return original(cuis);
+    };
+    const svc = new LookupService({ client: client as never, paths: freshPaths() });
+    const cuis = Array.from({ length: 101 }, (_, i) => String(10000000 + i));
+
+    const results = await svc.batchGetCompanies(cuis);
+
+    expect(batchSizes).toEqual([100, 1]);
+    expect(results.map((r) => r.vatCode)).toEqual(cuis);
+  });
+
   it('serves from cache when all CUIs are cached and only fetches misses', async () => {
     const paths = freshPaths();
     const client = new FakeClient();

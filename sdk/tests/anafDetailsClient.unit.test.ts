@@ -541,6 +541,16 @@ describe('AnafDetailsClient Unit Tests', () => {
       expect(fetch).not.toHaveBeenCalled();
       expect(await client.isValidVatCode('12abc')).toBe(false);
     });
+
+    test('accepts whitespace between the RO prefix and the digits', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({ found: found(123, '6201'), notFound: [] }));
+
+      await client.batchGetCompanyData(['RO 123'], { includeEfacturaRegistry: false });
+
+      expect(sentBody()[0].cui).toBe(123);
+      expect(await client.isValidVatCode('RO 123')).toBe(true);
+      expect(await client.isValidVatCode('RO 1')).toBe(false);
+    });
   });
 
   describe('Async API', () => {
