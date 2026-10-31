@@ -316,7 +316,10 @@ export class AnafDetailsClient {
     }
 
     // Extract registry data if available (graceful degradation)
-    const registryData = registryResult.status === 'fulfilled' ? (registryResult.value?.data ?? null) : null;
+    const registryData =
+      registryResult.status === 'fulfilled'
+        ? (registryResult.value?.data ?? null)
+        : this.registryNotFound(registryResult.reason);
 
     return this.transformResponse(companyResult.value.data, registryData);
   }
@@ -324,6 +327,12 @@ export class AnafDetailsClient {
   private isCalendarDate(date: string): boolean {
     const time = Date.parse(`${date}T00:00:00Z`);
     return /^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(time) && new Date(time).toISOString().startsWith(date);
+  }
+
+  /** The registry answers 404 with `{ found: [], notFound }` when none of the CUIs are registered. */
+  private registryNotFound(error: unknown): EFacturaRegistryResponse | null {
+    const notFound = error instanceof AnafNotFoundError ? this.parseNotFound(error.responseBody) : undefined;
+    return notFound ? { found: [], notFound } : null;
   }
 
   private parseNotFound(body: string | undefined): number[] | undefined {
