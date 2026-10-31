@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `AnafCompanyData.inactive`: whether ANAF lists the company as fiscally inactive (`stare_inactiv.statusInactivi`). Absent when the answer has no such field.
+
 ## [2.0.1] - 2026-10-30
 
 ### Fixed

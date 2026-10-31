@@ -599,6 +599,8 @@ export interface AnafCompanyData {
   scpTva: boolean;
   /** Main CAEN (activity) code, as ANAF sends it */
   caenCode?: string;
+  /** Whether ANAF lists the company as fiscally inactive on the requested date; absent when ANAF did not say */
+  inactive?: boolean;
   /** e-Factura registry information (if available) */
   efacturaRegistry?: {
     /** Whether the company is registered in the e-Factura registry */
@@ -684,6 +686,7 @@ export interface AnafScpTvaInfo {
 export interface AnafFoundCompany {
   date_generale: AnafCompanyInfo;
   inregistrare_scop_Tva: AnafScpTvaInfo;
+  stare_inactiv?: { statusInactivi: boolean };
 }
 
 /**

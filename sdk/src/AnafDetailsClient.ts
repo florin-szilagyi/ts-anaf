@@ -137,6 +137,8 @@ export class AnafDetailsClient {
           scpTva: element.inregistrare_scop_Tva.scpTVA || false,
           caenCode: element.date_generale.cod_CAEN,
         };
+        const inactive = element.stare_inactiv?.statusInactivi;
+        if (typeof inactive === 'boolean') companyData.inactive = inactive;
 
         if (registryEntry) {
           companyData.efacturaRegistry = {
