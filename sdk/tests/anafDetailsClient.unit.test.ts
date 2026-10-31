@@ -146,6 +146,25 @@ describe('AnafDetailsClient Unit Tests', () => {
       );
     });
 
+    test('should return the fiscal inactive flag when ANAF sends it', async () => {
+      const found = mockSuccessResponse.found![0]!;
+      (fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse({ found: [{ ...found, stare_inactiv: { statusInactivi: true } }] })
+      );
+
+      const result = await client.batchGetCompanyData(['RO12345678'], { includeEfacturaRegistry: false });
+
+      expect(result.data?.[0]?.inactive).toBe(true);
+    });
+
+    test('should leave the fiscal inactive flag out when ANAF does not send it', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse(mockSuccessResponse));
+
+      const result = await client.batchGetCompanyData(['RO12345678'], { includeEfacturaRegistry: false });
+
+      expect(result.data?.[0]).not.toHaveProperty('inactive');
+    });
+
     test('should mark company as not registered when not in e-Factura registry', async () => {
       (fetch as jest.Mock)
         .mockResolvedValueOnce(mockJsonResponse(mockSuccessResponse))
