@@ -193,6 +193,7 @@ describe('AnafDetailsClient Unit Tests', () => {
       expect(result.success).toBe(true);
       expect(result.data?.[0]?.name).toBe('Test Company SRL');
       expect(result.data?.[0]?.efacturaRegistry).toBeUndefined();
+      expect(result.efacturaRegistryError?.message).toContain('Registry service unavailable');
     });
 
     test('should handle company not found', async () => {
@@ -504,6 +505,53 @@ describe('AnafDetailsClient Unit Tests', () => {
       const result = await client.batchGetCompanyData(['RO12345678']);
 
       expect(result.data?.[0]?.efacturaRegistry).toBeUndefined();
+      expect(result.efacturaRegistryError?.statusCode).toBe(404);
+    });
+
+    test('reports a registry 503 on the result and still returns the company', async () => {
+      (fetch as jest.Mock)
+        .mockResolvedValueOnce(mockJsonResponse({ found: found(12345678, '6201'), notFound: [] }))
+        .mockResolvedValueOnce(mockErrorResponse(503, 'Service Unavailable', 'down'));
+
+      const result = await client.batchGetCompanyData(['RO12345678']);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.[0]?.efacturaRegistry).toBeUndefined();
+      expect(result.efacturaRegistryError).toMatchObject({ statusCode: 503 });
+    });
+
+    test('reports no registry error when the registry answers 404 with the CUI in notFound', async () => {
+      (fetch as jest.Mock)
+        .mockResolvedValueOnce(mockJsonResponse({ found: found(12345678, '6201'), notFound: [] }))
+        .mockResolvedValueOnce(
+          mockErrorResponse(404, 'Not Found', JSON.stringify({ found: [], notFound: [12345678] }))
+        );
+
+      const result = await client.batchGetCompanyData(['RO12345678']);
+
+      expect(result).not.toHaveProperty('efacturaRegistryError');
+    });
+
+    test('returns the registration date, status and legal-form fields ANAF sends', async () => {
+      const [company] = found(12345678, '6201')!;
+      Object.assign(company!.date_generale, {
+        data_inregistrare: '2020-01-15',
+        stare_inregistrare: 'INREGISTRAT din data 15.01.2020',
+        forma_juridica: 'PERSOANA JURIDICA',
+        forma_organizare: 'SRL',
+        forma_de_proprietate: '',
+      });
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({ found: [company], notFound: [] }));
+
+      const result = await client.batchGetCompanyData(['RO12345678'], { includeEfacturaRegistry: false });
+
+      expect(result.data?.[0]).toMatchObject({
+        registrationDate: '2020-01-15',
+        registrationStatus: 'INREGISTRAT din data 15.01.2020',
+        legalForm: 'PERSOANA JURIDICA',
+        organizationForm: 'SRL',
+      });
+      expect(result.data?.[0]).not.toHaveProperty('ownershipForm', '');
     });
 
     test('does not invent not-found CUIs when the 404 body is not the ANAF list', async () => {
