@@ -170,6 +170,8 @@ export class AnafDetailsClient {
         success: true,
         data,
         notFound: response.notFound ?? [],
+        // The internal type lists only the fields the SDK reads; the answer itself carries the rest
+        fullDetails: response.found as AnafCompanyFullDetails[],
       };
     }
 

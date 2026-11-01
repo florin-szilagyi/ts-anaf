@@ -652,6 +652,8 @@ export interface AnafCompanyResult {
   retryable?: boolean;
   /** Set when the e-Factura registry call failed; the company data is still returned, without `efacturaRegistry` */
   efacturaRegistryError?: { message: string; statusCode?: number };
+  /** The full ANAF v9 answer for each company in `data`, as ANAF sent it, in the same order */
+  fullDetails?: AnafCompanyFullDetails[];
 }
 
 /**
@@ -726,7 +728,7 @@ export interface AnafAsyncSubmitResponse {
 }
 
 /**
- * Full company details from the async ANAF API (v8)
+ * Full company details as ANAF sends them (v9 sync, v8 async)
  */
 export interface AnafCompanyFullDetails {
   date_generale: {
@@ -741,6 +743,7 @@ export interface AnafCompanyFullDetails {
     act: string;
     stare_inregistrare: string;
     data_inregistrare: string;
+    data_inreg_Reg_RO_e_Factura?: string;
     cod_CAEN: string;
     iban: string;
     statusRO_e_Factura: boolean;
@@ -756,7 +759,7 @@ export interface AnafCompanyFullDetails {
       data_sfarsit_ScpTVA: string;
       data_anul_imp_ScpTVA: string;
       mesaj_ScpTVA: string;
-    };
+    }[];
   };
   inregistrare_RTVAI: {
     dataInceputTvaInc: string;

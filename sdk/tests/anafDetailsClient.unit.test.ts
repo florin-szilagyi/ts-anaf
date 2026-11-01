@@ -554,6 +554,23 @@ describe('AnafDetailsClient Unit Tests', () => {
       expect(result.data?.[0]).not.toHaveProperty('ownershipForm', '');
     });
 
+    test('returns the full ANAF answer for each company, in order, as sent', async () => {
+      const [first] = found(12345678, '6201')!;
+      const [second] = found(87654321, '4711')!;
+      Object.assign(first!.date_generale, { iban: 'RO00TEST0000000000000000', statusRO_e_Factura: true });
+      Object.assign(first!, {
+        inregistrare_scop_Tva: { scpTVA: true, perioade_TVA: [{ data_inceput_ScpTVA: '2020-01-15' }] },
+      });
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({ found: [first, second], notFound: [] }));
+
+      const result = await client.batchGetCompanyData(['RO12345678', 'RO87654321'], {
+        includeEfacturaRegistry: false,
+      });
+
+      expect(result.fullDetails).toEqual([first, second]);
+      expect(result.fullDetails?.map((c) => c.date_generale.cui)).toEqual(result.data?.map((c) => Number(c.vatCode)));
+    });
+
     test('does not invent not-found CUIs when the 404 body is not the ANAF list', async () => {
       (fetch as jest.Mock).mockResolvedValueOnce(mockErrorResponse(404, 'Not Found', '<html>Not Found</html>'));
 
@@ -674,12 +691,14 @@ describe('AnafDetailsClient Unit Tests', () => {
       },
       inregistrare_scop_Tva: {
         scpTVA: true,
-        perioade_TVA: {
-          data_inceput_ScpTVA: '2020-01-15',
-          data_sfarsit_ScpTVA: '',
-          data_anul_imp_ScpTVA: '',
-          mesaj_ScpTVA: '',
-        },
+        perioade_TVA: [
+          {
+            data_inceput_ScpTVA: '2020-01-15',
+            data_sfarsit_ScpTVA: '',
+            data_anul_imp_ScpTVA: '',
+            mesaj_ScpTVA: '',
+          },
+        ],
       },
       inregistrare_RTVAI: {
         dataInceputTvaInc: '',
