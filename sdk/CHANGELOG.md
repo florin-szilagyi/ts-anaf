@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-11-01
+
 ### Fixed
 
 - e-Factura registry: a 404 answer whose body lists the CUI in `notFound` now gives `efacturaRegistry: { registered: false }`. Before, the SDK treated it as a failed request and left the field out, so no company outside the registry was ever reported as not registered.
