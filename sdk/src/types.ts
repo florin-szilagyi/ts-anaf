@@ -601,6 +601,16 @@ export interface AnafCompanyData {
   caenCode?: string;
   /** Whether ANAF lists the company as fiscally inactive on the requested date; absent when ANAF did not say */
   inactive?: boolean;
+  /** Registration date, as ANAF sends it (`data_inregistrare`); absent when ANAF sent none */
+  registrationDate?: string;
+  /** Registration status, as ANAF sends it (`stare_inregistrare`); absent when ANAF sent none */
+  registrationStatus?: string;
+  /** Legal form, as ANAF sends it (`forma_juridica`); absent when ANAF sent none */
+  legalForm?: string;
+  /** Form of organization, as ANAF sends it (`forma_organizare`); absent when ANAF sent none */
+  organizationForm?: string;
+  /** Form of ownership, as ANAF sends it (`forma_de_proprietate`); absent when ANAF sent none */
+  ownershipForm?: string;
   /** e-Factura registry information (if available) */
   efacturaRegistry?: {
     /** Whether the company is registered in the e-Factura registry */
@@ -640,6 +650,8 @@ export interface AnafCompanyResult {
   retryAfter?: string;
   /** Whether the same request can succeed later (429, 5xx, timeout, network error) */
   retryable?: boolean;
+  /** Set when the e-Factura registry call failed; the company data is still returned, without `efacturaRegistry` */
+  efacturaRegistryError?: { message: string; statusCode?: number };
 }
 
 /**
@@ -671,6 +683,11 @@ export interface AnafCompanyInfo {
   telefon: string;
   codPostal: string | null;
   cod_CAEN: string;
+  data_inregistrare?: string;
+  stare_inregistrare?: string;
+  forma_juridica?: string;
+  forma_organizare?: string;
+  forma_de_proprietate?: string;
 }
 
 /**

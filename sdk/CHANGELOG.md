@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-11-01
+
+### Added
+
+- `AnafCompanyData.registrationDate`, `registrationStatus`, `legalForm`, `organizationForm` and `ownershipForm`: the registration date, registration status and legal-form fields ANAF already sends in `date_generale` (`data_inregistrare`, `stare_inregistrare`, `forma_juridica`, `forma_organizare`, `forma_de_proprietate`). Absent when ANAF sends none or an empty string.
+- `AnafCompanyResult.efacturaRegistryError`: `{ message, statusCode? }`, set when the e-Factura registry call failed. The company data is still returned, without `efacturaRegistry`. Before, the failure was dropped silently. A registry 404 that lists the CUI in `notFound` is still `{ registered: false }` and not an error.
+
 ## [2.0.3] - 2026-11-01
 
 ### Fixed

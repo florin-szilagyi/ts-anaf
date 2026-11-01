@@ -136,6 +136,11 @@ export class AnafDetailsClient {
           contactPhone: element.date_generale.telefon,
           scpTva: element.inregistrare_scop_Tva.scpTVA || false,
           caenCode: element.date_generale.cod_CAEN,
+          registrationDate: element.date_generale.data_inregistrare || undefined,
+          registrationStatus: element.date_generale.stare_inregistrare || undefined,
+          legalForm: element.date_generale.forma_juridica || undefined,
+          organizationForm: element.date_generale.forma_organizare || undefined,
+          ownershipForm: element.date_generale.forma_de_proprietate || undefined,
         };
         const inactive = element.stare_inactiv?.statusInactivi;
         if (typeof inactive === 'boolean') companyData.inactive = inactive;
@@ -315,13 +320,22 @@ export class AnafDetailsClient {
       };
     }
 
-    // Extract registry data if available (graceful degradation)
+    // The registry failing must not fail the lookup, but it is reported on the result
     const registryData =
       registryResult.status === 'fulfilled'
         ? (registryResult.value?.data ?? null)
         : this.registryNotFound(registryResult.reason);
+    const result = this.transformResponse(companyResult.value.data, registryData);
 
-    return this.transformResponse(companyResult.value.data, registryData);
+    if (registryResult.status === 'rejected' && !registryData) {
+      const { reason } = registryResult;
+      result.efacturaRegistryError = {
+        message: reason instanceof Error ? reason.message : String(reason),
+        statusCode: reason instanceof AnafSdkError ? reason.statusCode : undefined,
+      };
+    }
+
+    return result;
   }
 
   private isCalendarDate(date: string): boolean {
