@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-11-01
+
+### Added
+
+- `AnafCompanyResult.fullDetails`: the full ANAF v9 answer for each company in `data`, as ANAF sent it and in the same order. It carries what `AnafCompanyData` leaves out: `iban`, `fax`, `act`, `organFiscalCompetent`, `statusRO_e_Factura`, the VAT periods, the VAT-on-collection and split-VAT registers, the inactive dates and both addresses.
+
+### Fixed
+
+- `AnafCompanyFullDetails.inregistrare_scop_Tva.perioade_TVA` is an array of periods, as ANAF v9 sends it. The type said a single object. Code that read it as an object must read the array.
+- `AnafCompanyFullDetails.date_generale.data_inreg_Reg_RO_e_Factura?` is typed. ANAF v9 sends it.
+
 ## [2.0.4] - 2026-11-01
 
 ### Added
