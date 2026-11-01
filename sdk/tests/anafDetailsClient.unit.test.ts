@@ -1,5 +1,12 @@
 import { AnafDetailsClient } from '../src/AnafDetailsClient';
-import { AnafCompanyResult, AnafApiResponse, AnafAsyncSubmitResponse, AnafAsyncResultResponse, AnafCompanyFullDetails, EFacturaRegistryResponse } from '../src/types';
+import {
+  AnafCompanyResult,
+  AnafApiResponse,
+  AnafAsyncSubmitResponse,
+  AnafAsyncResultResponse,
+  AnafCompanyFullDetails,
+  EFacturaRegistryResponse,
+} from '../src/types';
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -477,6 +484,28 @@ describe('AnafDetailsClient Unit Tests', () => {
       expect(result).toMatchObject({ success: false, notFound: [1, 2], statusCode: 404, retryable: false });
     });
 
+    test('marks a company as not registered when the e-Factura registry answers 404 with it in notFound', async () => {
+      (fetch as jest.Mock)
+        .mockResolvedValueOnce(mockJsonResponse({ found: found(12345678, '6201'), notFound: [] }))
+        .mockResolvedValueOnce(
+          mockErrorResponse(404, 'Not Found', JSON.stringify({ found: [], notFound: [12345678] }))
+        );
+
+      const result = await client.batchGetCompanyData(['RO12345678']);
+
+      expect(result.data?.[0]?.efacturaRegistry).toEqual({ registered: false });
+    });
+
+    test('leaves e-Factura out when the registry 404 body is not the ANAF list', async () => {
+      (fetch as jest.Mock)
+        .mockResolvedValueOnce(mockJsonResponse({ found: found(12345678, '6201'), notFound: [] }))
+        .mockResolvedValueOnce(mockErrorResponse(404, 'Not Found', '<html>Not Found</html>'));
+
+      const result = await client.batchGetCompanyData(['RO12345678']);
+
+      expect(result.data?.[0]?.efacturaRegistry).toBeUndefined();
+    });
+
     test('does not invent not-found CUIs when the 404 body is not the ANAF list', async () => {
       (fetch as jest.Mock).mockResolvedValueOnce(mockErrorResponse(404, 'Not Found', '<html>Not Found</html>'));
 
@@ -695,9 +724,7 @@ describe('AnafDetailsClient Unit Tests', () => {
     });
 
     test('should handle missing correlationId', async () => {
-      (fetch as jest.Mock).mockResolvedValueOnce(
-        mockJsonResponse({ cod: 200, message: 'Successful' }),
-      );
+      (fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({ cod: 200, message: 'Successful' }));
 
       const result = await client.getCompanyDataAsync('RO12345678');
 
@@ -766,10 +793,10 @@ describe('AnafDetailsClient Unit Tests', () => {
         .mockResolvedValueOnce(mockJsonResponse(mockSubmitResponse))
         .mockResolvedValueOnce(mockJsonResponse(resultWithNotFound));
 
-      const result = await client.batchGetCompanyDataAsync(
-        ['RO12345678', 'RO99999999'],
-        { initialDelay: 2000, retryDelay: 100 },
-      );
+      const result = await client.batchGetCompanyDataAsync(['RO12345678', 'RO99999999'], {
+        initialDelay: 2000,
+        retryDelay: 100,
+      });
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(1);
