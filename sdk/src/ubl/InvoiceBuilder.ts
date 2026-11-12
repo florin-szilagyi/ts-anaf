@@ -333,7 +333,9 @@ function validateTaxRepresentative(representative: TaxRepresentative, isSupplier
     throw new AnafValidationError(`${role} VAT number is required (BR-56)`);
   }
 
-  if (!/^[A-Z]{2}/.test(representative.vatNumber.trim())) {
+  // ponytail: prefix shape only (two letters, or Kosovo's 1A), not the full ISO 3166-1
+  // list — ANAF runs the complete BR-CO-09 on upload. Tested untrimmed: it is emitted as given.
+  if (!/^([A-Z]{2}|1A)/.test(representative.vatNumber)) {
     throw new AnafValidationError(`${role} VAT number must start with a country prefix, e.g. RO12345678 (BR-CO-09)`);
   }
 
@@ -343,8 +345,13 @@ function validateTaxRepresentative(representative: TaxRepresentative, isSupplier
 
   validateAddress(representative.address, role);
 
-  if ((representative.address.countryCode || DEFAULT_COUNTRY_CODE) === 'RO' && !representative.address.county?.trim()) {
-    throw new AnafValidationError(`${role} county is required when the country is RO (BR-RO-170)`);
+  if (
+    (representative.address.countryCode || DEFAULT_COUNTRY_CODE) === 'RO' &&
+    !/^RO-[A-Z]{1,2}$/.test(representative.address.county ?? '')
+  ) {
+    throw new AnafValidationError(
+      `${role} county must be an ISO 3166-2:RO code, e.g. RO-CJ, when the country is RO (BR-RO-170)`
+    );
   }
 }
 

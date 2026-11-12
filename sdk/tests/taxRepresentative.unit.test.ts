@@ -73,6 +73,11 @@ describe('Tax representative (BG-11) and contact name', () => {
       /country prefix/,
     ],
     [
+      'a VAT number with leading whitespace',
+      { taxRepresentative: { ...representative, vatNumber: ' RO11223344' } },
+      /country prefix/,
+    ],
+    [
       'a missing city',
       { taxRepresentative: { ...representative, address: { ...representative.address, city: '' } } },
       /Tax representative city is required/,
@@ -80,7 +85,12 @@ describe('Tax representative (BG-11) and contact name', () => {
     [
       'a missing county in Romania',
       { taxRepresentative: { ...representative, address: { ...representative.address, county: undefined } } },
-      /county is required/,
+      /county must be an ISO 3166-2:RO code/,
+    ],
+    [
+      'a county name in place of its code',
+      { taxRepresentative: { ...representative, address: { ...representative.address, county: 'Cluj' } } },
+      /county must be an ISO 3166-2:RO code/,
     ],
     [
       'a supplier that is not a VAT payer',
@@ -90,6 +100,12 @@ describe('Tax representative (BG-11) and contact name', () => {
   ])('rejects %s', (_label, overrides, message) => {
     expect(() => builder.generateInvoiceXml(buildInput(overrides))).toThrow(AnafValidationError);
     expect(() => builder.generateInvoiceXml(buildInput(overrides))).toThrow(message);
+  });
+
+  test('accepts the Kosovo VAT prefix 1A', () => {
+    const kosovo = { ...representative, vatNumber: '1A123456' };
+
+    expect(() => builder.generateInvoiceXml(buildInput({ taxRepresentative: kosovo }))).not.toThrow();
   });
 
   test('accepts a foreign tax representative address with no county', () => {

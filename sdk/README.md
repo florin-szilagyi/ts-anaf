@@ -156,8 +156,8 @@ const xml = builder.generateInvoiceXml({
 ```
 
 The builder throws `AnafValidationError` when the tax representative has no
-name, no prefixed VAT number, no county for a Romanian address, or when the
-supplier is not a VAT payer.
+name, no prefixed VAT number, no ISO 3166-2:RO county code (`RO-CJ`) for a
+Romanian address, or when the supplier is not a VAT payer.
 
 ### 4. AnafDetailsClient - Company Data Lookup
 

@@ -320,7 +320,7 @@ export interface TaxRepresentative {
   name: string;
   /** BT-63 — VAT identifier with its country prefix, e.g. `RO12345678` (BR-56, BR-CO-09). */
   vatNumber: string;
-  /** BG-12 — `county` is required when the country is RO (BR-RO-170). */
+  /** BG-12 — `county` must be an ISO 3166-2:RO code such as `RO-CJ` when the country is RO (BR-RO-170). */
   address: Address;
 }
 
