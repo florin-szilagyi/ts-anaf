@@ -138,6 +138,27 @@ const xml = builder.generateInvoiceXml({
 });
 ```
 
+Optional parties and contacts:
+
+```typescript
+const xml = builder.generateInvoiceXml({
+  // ...the fields above
+  note: 'Delegat: Ion Exemplu', // BT-22
+  supplier: { /* ... */ contactName: 'Ana Exemplu' }, // BT-41
+  customer: { /* ... */ contactName: 'Ion Exemplu' }, // BT-56
+  // BG-11: only for a seller that has appointed a tax representative.
+  taxRepresentative: {
+    name: 'Reprezentant Exemplu SRL',
+    vatNumber: 'RO11223344', // with country prefix
+    address: { street: 'Str. Exemplu 5', city: 'Cluj-Napoca', postalZone: '400002', county: 'RO-CJ' },
+  },
+});
+```
+
+The builder throws `AnafValidationError` when the tax representative has no
+name, no prefixed VAT number, no ISO 3166-2:RO county code (`RO-CJ`) for a
+Romanian address, or when the supplier is not a VAT payer.
+
 ### 4. AnafDetailsClient - Company Data Lookup
 
 ```typescript
@@ -218,6 +239,10 @@ invoice.issueDate; // '2026-08-01'
 invoice.supplierName; // 'Exemplu SRL'
 invoice.supplierVatCode; // 'RO12345678'
 invoice.totalAmount; // '119.00' — a string, not 119
+invoice.notes; // every invoice note (BT-22) in document order; [] when there are none
+invoice.supplierContact; // { name, telephone, email } | null
+invoice.customerContact; // { name, telephone, email } | null
+invoice.taxRepresentative; // { name, vatCode, address } | null (BG-11)
 invoice.sourceLines; // one ReceivedInvoiceLine per document line
 invoice.sourceLineDiagnostics; // human-readable notes for malformed/absent line facts
 ```

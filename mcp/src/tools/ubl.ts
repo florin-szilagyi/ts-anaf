@@ -18,7 +18,14 @@ const partySchema = z.object({
   address: addressSchema,
   email: z.string().optional(),
   telephone: z.string().optional(),
+  contactName: z.string().optional().describe('Contact point name (BT-41 seller, BT-56 buyer)'),
   partyIdentificationId: z.string().optional(),
+});
+
+const taxRepresentativeSchema = z.object({
+  name: z.string(),
+  vatNumber: z.string().describe('VAT identifier with country prefix, e.g. RO12345678'),
+  address: addressSchema,
 });
 
 const lineSchema = z.object({
@@ -46,6 +53,11 @@ export const buildUblInputSchema = z.object({
   invoicePeriodEndDate: z.string().optional(),
   supplier: partySchema,
   customer: partySchema,
+  taxRepresentative: taxRepresentativeSchema
+    .optional()
+    .describe(
+      'Seller tax representative (BG-11). Only for a seller that has appointed one; county is required when the country is RO'
+    ),
   lines: z.array(lineSchema).min(1),
   paymentIban: z.string().optional(),
   isSupplierVatPayer: z.boolean().optional(),

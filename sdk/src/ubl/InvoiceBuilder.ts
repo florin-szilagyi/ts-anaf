@@ -5,6 +5,7 @@ import {
   InvoiceLine,
   Party,
   Address,
+  TaxRepresentative,
   DocumentAllowanceCharge,
   UblInvoiceInput, // Legacy compatibility
 } from '../types';
@@ -60,8 +61,69 @@ function buildPartyXml(root: XMLBuilder, tagName: string, party: Party, isSuppli
   // Party Name
   partyElement.ele('cac:PartyName').ele('cbc:Name').txt(party.registrationName).up().up();
 
-  // Postal Address
-  const postalAddress = partyElement
+  buildPostalAddressXml(partyElement, address);
+
+  // Party Tax Scheme (if VAT number provided) — must come before PartyLegalEntity.
+  // BR-O-02: when the supplier is non-VAT (all lines are category 'O'), neither the
+  // seller VAT id (BT-31) nor the buyer VAT id (BT-48) may be present.
+  if (party.vatNumber && isSupplierVatPayer) {
+    buildVatTaxSchemeXml(partyElement, party.vatNumber);
+  }
+
+  // Party Legal Entity
+  partyElement
+    .ele('cac:PartyLegalEntity')
+    .ele('cbc:RegistrationName')
+    .txt(party.registrationName)
+    .up()
+    .ele('cbc:CompanyID')
+    .txt(party.companyId)
+    .up()
+    .up();
+
+  // Contact (optional) — UBL fixes the child order: Name, Telephone, ElectronicMail.
+  if (party.contactName || party.email || party.telephone) {
+    const contactElement = partyElement.ele('cac:Contact');
+    if (party.contactName) {
+      contactElement.ele('cbc:Name').txt(party.contactName).up();
+    }
+    if (party.telephone) {
+      contactElement.ele('cbc:Telephone').txt(party.telephone).up();
+    }
+    if (party.email) {
+      contactElement.ele('cbc:ElectronicMail').txt(party.email).up();
+    }
+    contactElement.up();
+  }
+}
+
+/**
+ * Seller tax representative (BG-11). UBL allows exactly these children, in this
+ * order: PartyName, PostalAddress, PartyTaxScheme.
+ */
+function buildTaxRepresentativeXml(root: XMLBuilder, representative: TaxRepresentative): void {
+  const element = root.ele('cac:TaxRepresentativeParty');
+  element.ele('cac:PartyName').ele('cbc:Name').txt(representative.name).up().up();
+  buildPostalAddressXml(element, representative.address);
+  buildVatTaxSchemeXml(element, representative.vatNumber);
+}
+
+function buildVatTaxSchemeXml(parent: XMLBuilder, vatNumber: string): void {
+  parent
+    .ele('cac:PartyTaxScheme')
+    .ele('cbc:CompanyID')
+    .txt(vatNumber)
+    .up()
+    .ele('cac:TaxScheme')
+    .ele('cbc:ID')
+    .txt('VAT')
+    .up()
+    .up()
+    .up();
+}
+
+function buildPostalAddressXml(parent: XMLBuilder, address: Address): void {
+  const postalAddress = parent
     .ele('cac:PostalAddress')
     .ele('cbc:StreetName')
     .txt(address.street || '')
@@ -86,46 +148,6 @@ function buildPartyXml(root: XMLBuilder, tagName: string, party: Party, isSuppli
     .up()
     .up()
     .up();
-
-  // Party Tax Scheme (if VAT number provided) — must come before PartyLegalEntity.
-  // BR-O-02: when the supplier is non-VAT (all lines are category 'O'), neither the
-  // seller VAT id (BT-31) nor the buyer VAT id (BT-48) may be present.
-  if (party.vatNumber && isSupplierVatPayer) {
-    partyElement
-      .ele('cac:PartyTaxScheme')
-      .ele('cbc:CompanyID')
-      .txt(party.vatNumber)
-      .up()
-      .ele('cac:TaxScheme')
-      .ele('cbc:ID')
-      .txt('VAT')
-      .up()
-      .up()
-      .up();
-  }
-
-  // Party Legal Entity
-  partyElement
-    .ele('cac:PartyLegalEntity')
-    .ele('cbc:RegistrationName')
-    .txt(party.registrationName)
-    .up()
-    .ele('cbc:CompanyID')
-    .txt(party.companyId)
-    .up()
-    .up();
-
-  // Contact (optional)
-  if (party.email || party.telephone) {
-    const contactElement = partyElement.ele('cac:Contact');
-    if (party.telephone) {
-      contactElement.ele('cbc:Telephone').txt(party.telephone).up();
-    }
-    if (party.email) {
-      contactElement.ele('cbc:ElectronicMail').txt(party.email).up();
-    }
-    contactElement.up();
-  }
 }
 
 /**
@@ -286,6 +308,50 @@ function validateAddress(address: Address, role: string): void {
 
   if (!address.postalZone?.trim()) {
     throw new AnafValidationError(`${role} postal zone is required`);
+  }
+}
+
+/**
+ * Validate the seller tax representative (BG-11) against the rules ANAF would
+ * otherwise reject after upload.
+ */
+function validateTaxRepresentative(representative: TaxRepresentative, isSupplierVatPayer: boolean): void {
+  const role = 'Tax representative';
+
+  if (!isSupplierVatPayer) {
+    throw new AnafValidationError(
+      `${role} is not allowed when the supplier is not a VAT payer: ` +
+        'BR-56 requires its VAT number and BR-O-02 forbids that number'
+    );
+  }
+
+  if (!representative.name?.trim()) {
+    throw new AnafValidationError(`${role} name is required (BR-18)`);
+  }
+
+  if (!representative.vatNumber?.trim()) {
+    throw new AnafValidationError(`${role} VAT number is required (BR-56)`);
+  }
+
+  // ponytail: prefix shape only (two letters, or Kosovo's 1A), not the full ISO 3166-1
+  // list — ANAF runs the complete BR-CO-09 on upload. Tested untrimmed: it is emitted as given.
+  if (!/^([A-Z]{2}|1A)/.test(representative.vatNumber)) {
+    throw new AnafValidationError(`${role} VAT number must start with a country prefix, e.g. RO12345678 (BR-CO-09)`);
+  }
+
+  if (!representative.address) {
+    throw new AnafValidationError(`${role} address is required (BR-19)`);
+  }
+
+  validateAddress(representative.address, role);
+
+  if (
+    (representative.address.countryCode || DEFAULT_COUNTRY_CODE) === 'RO' &&
+    !/^RO-[A-Z]{1,2}$/.test(representative.address.county ?? '')
+  ) {
+    throw new AnafValidationError(
+      `${role} county must be an ISO 3166-2:RO code, e.g. RO-CJ, when the country is RO (BR-RO-170)`
+    );
   }
 }
 
@@ -593,6 +659,9 @@ export function buildInvoiceXml(input: InvoiceInput): string {
   // Set defaults
   const currency = input.currency || DEFAULT_CURRENCY;
   const isSupplierVatPayer = input.isSupplierVatPayer ?? !!input.supplier.vatNumber;
+  if (input.taxRepresentative) {
+    validateTaxRepresentative(input.taxRepresentative, isSupplierVatPayer);
+  }
 
   // A corrective ("storno") invoice references a preceding invoice via
   // billingReference. Its presence relaxes the negative-amount guards below;
@@ -711,6 +780,10 @@ export function buildInvoiceXml(input: InvoiceInput): string {
   // Parties
   buildPartyXml(root, 'cac:AccountingSupplierParty', input.supplier, isSupplierVatPayer);
   buildPartyXml(root, 'cac:AccountingCustomerParty', input.customer, isSupplierVatPayer);
+  // UBL order: after the customer party (and PayeeParty), before PaymentMeans.
+  if (input.taxRepresentative) {
+    buildTaxRepresentativeXml(root, input.taxRepresentative);
+  }
 
   // Payment means — emitted when either a means code or an IBAN is provided.
   //

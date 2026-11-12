@@ -26,6 +26,7 @@ const partyOverrideSchema = z
     vatNumber: z.string().min(1).optional(),
     email: z.string().min(1).optional(),
     telephone: z.string().min(1).optional(),
+    contactName: z.string().min(1).optional(),
     partyIdentificationId: z.string().min(1).optional(),
     address: z
       .object({
@@ -37,6 +38,22 @@ const partyOverrideSchema = z
       })
       .strict()
       .optional(),
+  })
+  .strict();
+
+const taxRepresentativeSchema = z
+  .object({
+    name: z.string().min(1),
+    vatNumber: z.string().min(1),
+    address: z
+      .object({
+        street: z.string().min(1),
+        city: z.string().min(1),
+        postalZone: z.string().min(1),
+        county: z.string().min(1).optional(),
+        countryCode: z.string().min(1).optional(),
+      })
+      .strict(),
   })
   .strict();
 
@@ -72,6 +89,7 @@ export const ublBuildInputSchema = z
     taxCurrencyTaxAmount: z.number().nonnegative().optional(),
     note: z.string().min(1).optional(),
     paymentIban: z.string().min(1).optional(),
+    taxRepresentative: taxRepresentativeSchema.optional(),
     overrides: overridesSchema.optional(),
     output: outputSchema,
   })
@@ -137,6 +155,7 @@ export function normalizeUblBuildAction(input: UblBuildInput): UblBuildAction {
       taxCurrencyTaxAmount: data.taxCurrencyTaxAmount,
       note: data.note,
       paymentIban: data.paymentIban,
+      taxRepresentative: data.taxRepresentative,
       overrides: data.overrides as InvoiceOverrides | undefined,
     },
     output,

@@ -126,6 +126,29 @@ describe('UblService.buildFromAction', () => {
     expect(result.invoice.customer.address.street).toBe('Cluj, Strada B nr 2');
   });
 
+  it('writes the tax representative and an overridden contact name into the XML', async () => {
+    const h = harness();
+    const action = normalizeUblBuildAction({
+      context: 'RO12345678',
+      invoiceNumber: 'FCT-TR',
+      issueDate: '2026-11-12',
+      customerCui: 'RO87654321',
+      lines: ['x|1|100|19'],
+      taxRepresentative: {
+        name: 'Reprezentant Exemplu SRL',
+        vatNumber: 'RO11223344',
+        address: { street: 'Str. Exemplu 5', city: 'Cluj-Napoca', postalZone: '400002', county: 'RO-CJ' },
+      },
+      overrides: { customer: { contactName: 'Ion Exemplu' } },
+    });
+    const result = await h.service.buildFromAction(action);
+    expect(result.invoice.customer.contactName).toBe('Ion Exemplu');
+    expect(result.xml).toContain('<cbc:Name>Ion Exemplu</cbc:Name>');
+    expect(result.xml).toMatch(
+      /<cac:TaxRepresentativeParty>\s*<cac:PartyName>\s*<cbc:Name>Reprezentant Exemplu SRL<\/cbc:Name>/
+    );
+  });
+
   it('applies supplier overrides on top of the hydrated party', async () => {
     const h = harness();
     const action = normalizeUblBuildAction({

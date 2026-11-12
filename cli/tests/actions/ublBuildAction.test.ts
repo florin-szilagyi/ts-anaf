@@ -175,4 +175,26 @@ describe('normalizeUblBuildAction', () => {
     });
     expect(action.invoice.overrides?.customer?.registrationName).toBe('Custom Name SRL');
   });
+
+  it('passes the tax representative through and rejects unknown keys in it', () => {
+    const base = {
+      context: 'acme-prod',
+      invoiceNumber: 'FCT-1',
+      issueDate: '2026-04-11',
+      customerCui: 'RO87654321',
+      lines: ['x|1|1|0'],
+    };
+    const taxRepresentative = {
+      name: 'Reprezentant Exemplu SRL',
+      vatNumber: 'RO11223344',
+      address: { street: 'Str. Exemplu 5', city: 'Cluj-Napoca', postalZone: '400002', county: 'RO-CJ' },
+    };
+
+    expect(normalizeUblBuildAction({ ...base, taxRepresentative }).invoice.taxRepresentative).toEqual(
+      taxRepresentative
+    );
+    expect(() =>
+      normalizeUblBuildAction({ ...base, taxRepresentative: { ...taxRepresentative, email: 'x@exemplu.ro' } } as never)
+    ).toThrow(CliError);
+  });
 });

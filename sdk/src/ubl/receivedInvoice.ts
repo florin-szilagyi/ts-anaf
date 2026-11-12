@@ -35,7 +35,8 @@ export type ReceivedInvoiceLine = {
 };
 
 /**
- * The supplier postal address as the document carried it. Every field is
+ * A postal address as the document carried it — the supplier's, and the tax
+ * representative's despite the type name. Every field is
  * filled by the parser; nothing here is normalized or looked up, so a
  * consumer that also holds registry or message-listing metadata (a raw VAT
  * id, an emitter CUI from a message listing) keeps that on its own type
@@ -47,6 +48,20 @@ export type ReceivedSupplierAddress = {
   county: string | null;
   postalZone: string | null;
   countryCode: string | null;
+};
+
+/** A contact group (BG-6 seller, BG-9 buyer) as the document carried it. */
+export type ReceivedContact = {
+  name: string | null;
+  telephone: string | null;
+  email: string | null;
+};
+
+/** The seller tax representative (BG-11) and its postal address (BG-12). */
+export type ReceivedTaxRepresentative = {
+  name: string | null;
+  vatCode: string | null;
+  address: ReceivedSupplierAddress;
 };
 
 export type ReceivedInvoice = {
@@ -79,6 +94,16 @@ export type ReceivedInvoice = {
   supplierName: string | null;
   supplierVatCode: string | null;
   supplierAddress: ReceivedSupplierAddress;
+  /** Every invoice note (BT-22) in document order, verbatim; empty when the document has none. */
+  notes: string[];
+  /**
+   * The contact and tax representative groups are null when the document does
+   * not carry the element, or carries it with no child elements. An element
+   * whose children are all empty yields an object of nulls.
+   */
+  supplierContact: ReceivedContact | null;
+  customerContact: ReceivedContact | null;
+  taxRepresentative: ReceivedTaxRepresentative | null;
   /**
    * Decimal strings, never numbers — exact decimals all the way through.
    * Published digits are preserved; only the sign and an empty integer or
@@ -209,6 +234,67 @@ const firstText = (...values: unknown[]): string | null => {
 };
 
 const attributeOf = (value: unknown, name: string): string | null => textOf(objectOf(value)?.[`@_${name}`]);
+
+const textsOf = (values: unknown[]): string[] => values.map(textOf).filter((text): text is string => text !== null);
+
+const ublAddressOf = (address: unknown): ReceivedSupplierAddress => ({
+  street: textOf(at(address, 'StreetName')),
+  city: textOf(at(address, 'CityName')),
+  county: textOf(at(address, 'CountrySubentity')),
+  postalZone: textOf(at(address, 'PostalZone')),
+  countryCode: textOf(at(address, 'Country', 'IdentificationCode')),
+});
+
+const ciiAddressOf = (address: unknown): ReceivedSupplierAddress => ({
+  street: textOf(at(address, 'LineOne')),
+  city: textOf(at(address, 'CityName')),
+  county: textOf(at(address, 'CountrySubDivisionName')),
+  postalZone: textOf(at(address, 'PostcodeCode')),
+  countryCode: textOf(at(address, 'CountryID')),
+});
+
+const ublVatIdOf = (party: unknown): string | null =>
+  textOf(
+    at(
+      asArray(at(party, 'PartyTaxScheme')).find(
+        (scheme) => textOf(at(scheme, 'TaxScheme', 'ID'))?.toUpperCase() === 'VAT'
+      ),
+      'CompanyID'
+    )
+  );
+
+const ciiVatIdOf = (party: unknown): string | null =>
+  textOf(
+    at(
+      asArray(at(party, 'SpecifiedTaxRegistration')).find(
+        (registration) => attributeOf(at(registration, 'ID'), 'schemeID') === 'VA'
+      ),
+      'ID'
+    )
+  );
+
+const ublContactOf = (party: unknown): ReceivedContact | null => {
+  const contact = objectOf(at(party, 'Contact'));
+  return (
+    contact && {
+      name: textOf(contact.Name),
+      telephone: textOf(contact.Telephone),
+      email: textOf(contact.ElectronicMail),
+    }
+  );
+};
+
+const ciiContactOf = (party: unknown): ReceivedContact | null => {
+  const contact = objectOf(at(party, 'DefinedTradeContact'));
+  return (
+    contact && {
+      // EN 16931 binds the contact point (BT-41, BT-56) to either element.
+      name: firstText(contact.PersonName, contact.DepartmentName),
+      telephone: textOf(at(contact, 'TelephoneUniversalCommunication', 'CompleteNumber')),
+      email: textOf(at(contact, 'EmailURIUniversalCommunication', 'URIID')),
+    }
+  );
+};
 
 const isCalendarDate = (value: string): boolean => {
   if (!DATE.test(value)) {
@@ -435,9 +521,7 @@ const creditNoteTypeCodeOf = (rootKind: 'invoice' | 'credit_note', typeCode: str
 
 const parseUbl = (root: XmlObject, rootKind: 'invoice' | 'credit_note'): ReceivedInvoice => {
   const supplierParty = at(root, 'AccountingSupplierParty', 'Party');
-  const supplierAddress = at(supplierParty, 'PostalAddress');
-  const partyTaxSchemes = asArray(at(supplierParty, 'PartyTaxScheme'));
-  const vatTaxScheme = partyTaxSchemes.find((scheme) => textOf(at(scheme, 'TaxScheme', 'ID'))?.toUpperCase() === 'VAT');
+  const taxRepresentative = objectOf(at(root, 'TaxRepresentativeParty'));
   const currencyCode = currencyOf(at(root, 'DocumentCurrencyCode'));
   const taxAmountNodes = asArray(at(root, 'TaxTotal')).map((total) => at(total, 'TaxAmount'));
   const typeCode = textOf(at(root, rootKind === 'credit_note' ? 'CreditNoteTypeCode' : 'InvoiceTypeCode'));
@@ -456,14 +540,15 @@ const parseUbl = (root: XmlObject, rootKind: 'invoice' | 'credit_note'): Receive
       at(supplierParty, 'PartyLegalEntity', 'RegistrationName'),
       at(supplierParty, 'PartyName', 'Name')
     ),
-    supplierVatCode:
-      textOf(at(vatTaxScheme, 'CompanyID')) ?? textOf(at(supplierParty, 'PartyLegalEntity', 'CompanyID')),
-    supplierAddress: {
-      street: textOf(at(supplierAddress, 'StreetName')),
-      city: textOf(at(supplierAddress, 'CityName')),
-      county: textOf(at(supplierAddress, 'CountrySubentity')),
-      postalZone: textOf(at(supplierAddress, 'PostalZone')),
-      countryCode: textOf(at(supplierAddress, 'Country', 'IdentificationCode')),
+    supplierVatCode: ublVatIdOf(supplierParty) ?? textOf(at(supplierParty, 'PartyLegalEntity', 'CompanyID')),
+    supplierAddress: ublAddressOf(at(supplierParty, 'PostalAddress')),
+    notes: textsOf(asArray(at(root, 'Note'))),
+    supplierContact: ublContactOf(supplierParty),
+    customerContact: ublContactOf(at(root, 'AccountingCustomerParty', 'Party')),
+    taxRepresentative: taxRepresentative && {
+      name: textOf(at(taxRepresentative, 'PartyName', 'Name')),
+      vatCode: ublVatIdOf(taxRepresentative),
+      address: ublAddressOf(taxRepresentative.PostalAddress),
     },
     subtotalAmount: amountOf(at(root, 'LegalMonetaryTotal', 'TaxExclusiveAmount')),
     taxAmount: selectTaxAmount(taxAmountNodes, currencyCode),
@@ -475,13 +560,11 @@ const parseUbl = (root: XmlObject, rootKind: 'invoice' | 'credit_note'): Receive
 const parseCii = (root: XmlObject): ReceivedInvoice => {
   const transaction = at(root, 'SupplyChainTradeTransaction');
   const settlement = at(transaction, 'ApplicableHeaderTradeSettlement');
-  const seller = at(transaction, 'ApplicableHeaderTradeAgreement', 'SellerTradeParty');
-  const supplierAddress = at(seller, 'PostalTradeAddress');
+  const agreement = at(transaction, 'ApplicableHeaderTradeAgreement');
+  const seller = at(agreement, 'SellerTradeParty');
+  const taxRepresentative = objectOf(at(agreement, 'SellerTaxRepresentativeTradeParty'));
   const summation = at(settlement, 'SpecifiedTradeSettlementHeaderMonetarySummation');
   const currencyCode = currencyOf(at(settlement, 'InvoiceCurrencyCode'));
-  const vatRegistration = asArray(at(seller, 'SpecifiedTaxRegistration')).find(
-    (registration) => attributeOf(at(registration, 'ID'), 'schemeID') === 'VA'
-  );
 
   return {
     documentStandard: 'cii',
@@ -495,13 +578,15 @@ const parseCii = (root: XmlObject): ReceivedInvoice => {
     dueDate: ciiDateOf(at(settlement, 'SpecifiedTradePaymentTerms', 'DueDateDateTime', 'DateTimeString')),
     currencyCode,
     supplierName: textOf(at(seller, 'Name')),
-    supplierVatCode: textOf(at(vatRegistration, 'ID')),
-    supplierAddress: {
-      street: textOf(at(supplierAddress, 'LineOne')),
-      city: textOf(at(supplierAddress, 'CityName')),
-      county: textOf(at(supplierAddress, 'CountrySubDivisionName')),
-      postalZone: textOf(at(supplierAddress, 'PostcodeCode')),
-      countryCode: textOf(at(supplierAddress, 'CountryID')),
+    supplierVatCode: ciiVatIdOf(seller),
+    supplierAddress: ciiAddressOf(at(seller, 'PostalTradeAddress')),
+    notes: textsOf(asArray(at(root, 'ExchangedDocument', 'IncludedNote')).map((note) => at(note, 'Content'))),
+    supplierContact: ciiContactOf(seller),
+    customerContact: ciiContactOf(at(agreement, 'BuyerTradeParty')),
+    taxRepresentative: taxRepresentative && {
+      name: textOf(taxRepresentative.Name),
+      vatCode: ciiVatIdOf(taxRepresentative),
+      address: ciiAddressOf(taxRepresentative.PostalTradeAddress),
     },
     subtotalAmount: amountOf(at(summation, 'TaxBasisTotalAmount')),
     taxAmount: selectTaxAmount(asArray(at(summation, 'TaxTotalAmount')), currencyCode),

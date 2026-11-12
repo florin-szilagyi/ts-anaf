@@ -304,8 +304,24 @@ export interface Party {
   email?: string;
   /** Contact telephone number */
   telephone?: string;
+  /** Contact point name (BT-41 for the seller, BT-56 for the buyer) */
+  contactName?: string;
   /** Party identification ID (supplementary ID, e.g. internal reference) */
   partyIdentificationId?: string;
+}
+
+/**
+ * Seller tax representative (BG-11) and its postal address (BG-12), emitted as
+ * `cac:TaxRepresentativeParty`. Only for a seller that has appointed a fiscal
+ * representative; an ordinary invoice leaves it out.
+ */
+export interface TaxRepresentative {
+  /** BT-62 — name of the tax representative. */
+  name: string;
+  /** BT-63 — VAT identifier with its country prefix, e.g. `RO12345678` (BR-56, BR-CO-09). */
+  vatNumber: string;
+  /** BG-12 — `county` must be an ISO 3166-2:RO code such as `RO-CJ` when the country is RO (BR-RO-170). */
+  address: Address;
 }
 
 /**
@@ -433,6 +449,12 @@ export interface InvoiceInput {
   supplier: Party;
   /** Customer information */
   customer: Party;
+  /**
+   * Seller tax representative (BG-11). Rejected when the supplier is not a VAT
+   * payer: BR-56 requires the representative's VAT identifier and BR-O-02
+   * forbids it on a not-subject-to-VAT invoice.
+   */
+  taxRepresentative?: TaxRepresentative;
   /** Invoice line items */
   lines: InvoiceLine[];
   /** Payment IBAN (optional) */
