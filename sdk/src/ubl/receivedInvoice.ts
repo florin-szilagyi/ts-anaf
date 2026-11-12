@@ -35,7 +35,8 @@ export type ReceivedInvoiceLine = {
 };
 
 /**
- * The supplier postal address as the document carried it. Every field is
+ * A postal address as the document carried it — the supplier's, and the tax
+ * representative's despite the type name. Every field is
  * filled by the parser; nothing here is normalized or looked up, so a
  * consumer that also holds registry or message-listing metadata (a raw VAT
  * id, an emitter CUI from a message listing) keeps that on its own type
@@ -97,7 +98,8 @@ export type ReceivedInvoice = {
   notes: string[];
   /**
    * The contact and tax representative groups are null when the document does
-   * not carry the element, or carries it empty.
+   * not carry the element, or carries it with no child elements. An element
+   * whose children are all empty yields an object of nulls.
    */
   supplierContact: ReceivedContact | null;
   customerContact: ReceivedContact | null;
