@@ -228,6 +228,10 @@ describe('parseReceivedInvoice', () => {
         postalZone: '400001',
         countryCode: 'RO',
       },
+      notes: [],
+      supplierContact: null,
+      customerContact: null,
+      taxRepresentative: null,
       subtotalAmount: '100.00',
       taxAmount: '19.00',
       totalAmount: '119.00',
@@ -249,6 +253,122 @@ describe('parseReceivedInvoice', () => {
     });
     // Exact decimals: these must never become floats.
     expect(typeof parsed.totalAmount).toBe('string');
+  });
+
+  it('reads the tax representative and the buyer contact of an ANAF-form invoice', () => {
+    // The shape ANAF's own "Completare factură" form writes: no PostalZone, a
+    // name-only buyer contact, and the representative after the customer party.
+    const parsed = parseReceivedInvoice(
+      UBL_INVOICE.replace(
+        '  <cac:InvoiceLine>',
+        `  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyLegalEntity><cbc:RegistrationName>Client Exemplu SRL</cbc:RegistrationName></cac:PartyLegalEntity>
+      <cac:Contact><cbc:Name>Ion Exemplu</cbc:Name></cac:Contact>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:TaxRepresentativeParty>
+    <cac:PartyName><cbc:Name>Reprezentant Exemplu SRL</cbc:Name></cac:PartyName>
+    <cac:PostalAddress>
+      <cbc:StreetName>Strada Exemplu 5</cbc:StreetName>
+      <cbc:CityName>Cluj-Napoca</cbc:CityName>
+      <cbc:CountrySubentity>RO-CJ</cbc:CountrySubentity>
+      <cac:Country><cbc:IdentificationCode>RO</cbc:IdentificationCode></cac:Country>
+    </cac:PostalAddress>
+    <cac:PartyTaxScheme>
+      <cbc:CompanyID>RO11223344</cbc:CompanyID>
+      <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+    </cac:PartyTaxScheme>
+  </cac:TaxRepresentativeParty>
+  <cac:InvoiceLine>`
+      )
+    );
+
+    expect(parsed.taxRepresentative).toEqual({
+      name: 'Reprezentant Exemplu SRL',
+      vatCode: 'RO11223344',
+      address: {
+        street: 'Strada Exemplu 5',
+        city: 'Cluj-Napoca',
+        county: 'RO-CJ',
+        postalZone: null,
+        countryCode: 'RO',
+      },
+    });
+    expect(parsed.customerContact).toEqual({ name: 'Ion Exemplu', telephone: null, email: null });
+    expect(parsed.supplierContact).toBeNull();
+  });
+
+  it('reads every invoice note in document order', () => {
+    const withNotes = (notes: string) =>
+      parseReceivedInvoice(UBL_INVOICE.replace('<cbc:DocumentCurrencyCode>', `${notes}<cbc:DocumentCurrencyCode>`))
+        .notes;
+
+    expect(withNotes('<cbc:Note>Delegat: Ion Exemplu</cbc:Note>')).toEqual(['Delegat: Ion Exemplu']);
+    expect(withNotes('<cbc:Note>Prima &amp; a doua</cbc:Note><cbc:Note/><cbc:Note>#AAI#A treia</cbc:Note>')).toEqual([
+      'Prima & a doua',
+      '#AAI#A treia',
+    ]);
+  });
+
+  it('reads notes, contacts and the tax representative from a CII invoice', () => {
+    const parsed = parseReceivedInvoice(
+      CII_INVOICE.replace(
+        '</rsm:ExchangedDocument>',
+        `<ram:IncludedNote><ram:Content>Prima notă</ram:Content></ram:IncludedNote>
+    <ram:IncludedNote><ram:Content>A doua notă</ram:Content></ram:IncludedNote>
+  </rsm:ExchangedDocument>`
+      )
+        .replace(
+          '<ram:Name>Exemplu Industrial SA</ram:Name>',
+          `<ram:Name>Exemplu Industrial SA</ram:Name>
+        <ram:DefinedTradeContact>
+          <ram:PersonName>Ana Exemplu</ram:PersonName>
+          <ram:TelephoneUniversalCommunication><ram:CompleteNumber>0210000000</ram:CompleteNumber></ram:TelephoneUniversalCommunication>
+          <ram:EmailURIUniversalCommunication><ram:URIID>ana@exemplu.ro</ram:URIID></ram:EmailURIUniversalCommunication>
+        </ram:DefinedTradeContact>`
+        )
+        .replace(
+          '</ram:SellerTradeParty>',
+          `</ram:SellerTradeParty>
+      <ram:BuyerTradeParty>
+        <ram:Name>Client Exemplu SRL</ram:Name>
+        <ram:DefinedTradeContact><ram:DepartmentName>Achiziții</ram:DepartmentName></ram:DefinedTradeContact>
+      </ram:BuyerTradeParty>
+      <ram:SellerTaxRepresentativeTradeParty>
+        <ram:Name>Reprezentant Exemplu SRL</ram:Name>
+        <ram:PostalTradeAddress>
+          <ram:LineOne>Strada Exemplu 5</ram:LineOne>
+          <ram:CityName>Cluj-Napoca</ram:CityName>
+          <ram:CountryID>RO</ram:CountryID>
+          <ram:CountrySubDivisionName>RO-CJ</ram:CountrySubDivisionName>
+        </ram:PostalTradeAddress>
+        <ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">RO11223344</ram:ID></ram:SpecifiedTaxRegistration>
+      </ram:SellerTaxRepresentativeTradeParty>`
+        )
+    );
+
+    expect(parsed.notes).toEqual(['Prima notă', 'A doua notă']);
+    expect(parsed.supplierContact).toEqual({ name: 'Ana Exemplu', telephone: '0210000000', email: 'ana@exemplu.ro' });
+    expect(parsed.customerContact).toEqual({ name: 'Achiziții', telephone: null, email: null });
+    expect(parsed.taxRepresentative).toEqual({
+      name: 'Reprezentant Exemplu SRL',
+      vatCode: 'RO11223344',
+      address: {
+        street: 'Strada Exemplu 5',
+        city: 'Cluj-Napoca',
+        county: 'RO-CJ',
+        postalZone: null,
+        countryCode: 'RO',
+      },
+    });
+    // The untouched fixture carries none of the groups.
+    expect(parseReceivedInvoice(CII_INVOICE)).toMatchObject({
+      notes: [],
+      supplierContact: null,
+      customerContact: null,
+      taxRepresentative: null,
+    });
   });
 
   it('reads a UBL credit note, falling back through the name and VAT sources', () => {

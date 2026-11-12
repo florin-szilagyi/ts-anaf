@@ -34,6 +34,15 @@ describe('printJsonSchemaForKind', () => {
   }
 });
 
+describe('UblBuild JSON schema', () => {
+  it('documents the tax representative and the contact name override', () => {
+    const schema = JSON.parse(printJsonSchemaForKind('UblBuild'));
+
+    expect(schema.properties.spec.properties.taxRepresentative.required).toEqual(['name', 'vatNumber', 'address']);
+    expect(schema.definitions.partyOverride.properties.contactName).toBeDefined();
+  });
+});
+
 describe('manifestDocumentSchema', () => {
   it('rejects unknown top-level keys (strict)', () => {
     const result = manifestDocumentSchema.safeParse({

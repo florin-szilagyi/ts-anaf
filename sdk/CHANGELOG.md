@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.6] - 2026-11-13
+
+### Added
+
+- `InvoiceInput.taxRepresentative`: the seller tax representative (BG-11, BG-12), written as `cac:TaxRepresentativeParty` with a name, a postal address and a VAT number. The builder throws `AnafValidationError` when the name or the VAT number is missing, the VAT number has no country prefix, a Romanian address has no county, or the supplier is not a VAT payer.
+- `Party.contactName`: the contact point name (BT-41 for the seller, BT-56 for the buyer), written as `cac:Contact/cbc:Name`.
+- `ReceivedInvoice.notes`: every invoice note (BT-22) of a received document, in document order. Empty when the document has none.
+- `ReceivedInvoice.supplierContact` and `customerContact`: the name, telephone and email of the seller and buyer contact groups, or `null`.
+- `ReceivedInvoice.taxRepresentative`: the name, VAT number and address of the seller tax representative, or `null`.
+- The parser reads all of these from UBL and from CII documents.
+
 ## [2.0.5] - 2026-11-01
 
 ### Added

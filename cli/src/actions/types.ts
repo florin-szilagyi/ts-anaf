@@ -1,4 +1,4 @@
-import type { InvoiceTypeCode } from '@florinszilagyi/anaf-ts-sdk';
+import type { InvoiceTypeCode, TaxRepresentative } from '@florinszilagyi/anaf-ts-sdk';
 
 export type ActionKind = 'ubl.build' | 'efactura.upload';
 
@@ -22,6 +22,7 @@ export interface PartyOverride {
   vatNumber?: string;
   email?: string;
   telephone?: string;
+  contactName?: string;
   partyIdentificationId?: string;
   address?: {
     street?: string;
@@ -67,6 +68,8 @@ export interface UblBuildAction {
     taxCurrencyTaxAmount?: number;
     note?: string;
     paymentIban?: string;
+    /** Seller tax representative (BG-11). Manifest / file input only — no flags. */
+    taxRepresentative?: TaxRepresentative;
     overrides?: InvoiceOverrides;
   };
   output: OutputTarget;

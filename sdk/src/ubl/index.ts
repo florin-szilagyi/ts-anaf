@@ -9,7 +9,13 @@
 export { buildInvoiceXml, buildUblInvoiceXml } from './InvoiceBuilder';
 export { parseReceivedInvoice } from './receivedInvoice';
 
-export type { ReceivedInvoice, ReceivedInvoiceLine, ReceivedSupplierAddress } from './receivedInvoice';
+export type {
+  ReceivedContact,
+  ReceivedInvoice,
+  ReceivedInvoiceLine,
+  ReceivedSupplierAddress,
+  ReceivedTaxRepresentative,
+} from './receivedInvoice';
 
 // Re-export types for convenience
 export type {

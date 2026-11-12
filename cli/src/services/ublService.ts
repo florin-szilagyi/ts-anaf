@@ -59,6 +59,7 @@ export class UblService {
       note: action.invoice.note ?? action.invoice.overrides?.note,
       supplier,
       customer,
+      taxRepresentative: action.invoice.taxRepresentative,
       lines: action.invoice.lines.map(toInvoiceLine),
       paymentIban: action.invoice.paymentIban ?? action.invoice.overrides?.paymentIban,
       isSupplierVatPayer: supplier.vatNumber !== undefined,

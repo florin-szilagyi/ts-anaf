@@ -294,6 +294,7 @@ output:
 | `taxCurrencyTaxAmount` | number | no | Total VAT in RON when `currency ≠ RON`. Required for ANAF validation of non-RON invoices (BR-53 / BT-111) |
 | `paymentIban` | string | no | |
 | `note` | string | no | Free-form invoice note |
+| `taxRepresentative` | object | no | Seller tax representative (BG-11): `name`, `vatNumber` (with country prefix), `address`. Only for a seller that has appointed one. No command-line flag |
 | `lines` | array | yes | Min 1. Each item: string shorthand or object (see below) |
 | `overrides.supplier` | object | no | Any field overrides the ANAF-fetched value |
 | `overrides.customer` | object | no | Any field overrides the ANAF-fetched value |
@@ -332,6 +333,7 @@ overrides:
     vatNumber: "RO12345678"        # only for VAT-registered companies
     telephone: "0264-123456"
     email: "contact@example.ro"
+    contactName: "Ana Exemplu"     # contact point (BT-41 / BT-56)
     address:
       street: "Str. Exemplu 10"
       city: "Cluj-Napoca"

@@ -97,6 +97,28 @@ function ublBuildManifestJsonSchema(): Record<string, unknown> {
           currency: { type: 'string', minLength: 1 },
           note: { type: 'string', minLength: 1 },
           paymentIban: { type: 'string', minLength: 1 },
+          taxRepresentative: {
+            type: 'object',
+            description: 'Seller tax representative (BG-11). Only for a seller that has appointed one.',
+            required: ['name', 'vatNumber', 'address'],
+            additionalProperties: false,
+            properties: {
+              name: { type: 'string', minLength: 1 },
+              vatNumber: { type: 'string', minLength: 1, description: 'With country prefix, e.g. RO12345678.' },
+              address: {
+                type: 'object',
+                required: ['street', 'city', 'postalZone'],
+                additionalProperties: false,
+                properties: {
+                  street: { type: 'string', minLength: 1 },
+                  city: { type: 'string', minLength: 1 },
+                  postalZone: { type: 'string', minLength: 1 },
+                  county: { type: 'string', minLength: 1, description: 'Required when countryCode is RO, e.g. RO-CJ.' },
+                  countryCode: { type: 'string', minLength: 1 },
+                },
+              },
+            },
+          },
           overrides: {
             type: 'object',
             additionalProperties: false,
@@ -131,6 +153,7 @@ function ublBuildManifestJsonSchema(): Record<string, unknown> {
           vatNumber: { type: 'string', minLength: 1 },
           email: { type: 'string', minLength: 1 },
           telephone: { type: 'string', minLength: 1 },
+          contactName: { type: 'string', minLength: 1 },
           partyIdentificationId: { type: 'string', minLength: 1 },
           address: {
             type: 'object',

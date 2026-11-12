@@ -127,4 +127,24 @@ describe('handleBuildUbl', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/UBL_BUILD_FAILED|missing lines/);
   });
+
+  it('keeps the tax representative and the contact name through the input schema', async () => {
+    const address = { street: 'Str. Test 1', city: 'Cluj-Napoca', postalZone: '400001', county: 'RO-CJ' };
+    const input = buildUblInputSchema.parse({
+      invoiceNumber: 'INV-TR',
+      issueDate: '2026-11-12',
+      supplier: { registrationName: 'Acme SRL', companyId: '12345678', vatNumber: 'RO12345678', address },
+      customer: { registrationName: 'Beta SRL', companyId: '87654321', contactName: 'Ion Exemplu', address },
+      taxRepresentative: { name: 'Reprezentant Exemplu SRL', vatNumber: 'RO11223344', address },
+      lines: [{ description: 'Consultanta', quantity: 1, unitPrice: 100, taxPercent: 21 }],
+    });
+
+    const result = await handleBuildUbl(input, { builder: new UblBuilder() });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('<cbc:Name>Ion Exemplu</cbc:Name>');
+    expect(result.content[0].text).toMatch(
+      /<cac:TaxRepresentativeParty>\s*<cac:PartyName>\s*<cbc:Name>Reprezentant Exemplu SRL<\/cbc:Name>/
+    );
+  });
 });
